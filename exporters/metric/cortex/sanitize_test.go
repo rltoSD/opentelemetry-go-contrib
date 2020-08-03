@@ -35,6 +35,11 @@ func TestSanitize(t *testing.T) {
 			input: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789",
 			want:  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789",
 		},
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
 	}
 
 	for _, tt := range tests {
