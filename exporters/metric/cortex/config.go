@@ -25,6 +25,17 @@ type Option interface {
 	Apply(*Config)
 }
 
+// WithFilepath adds a path where Viper will search for the YAML file in.
+func WithFilepath(filepath string) Option {
+	return filepathOption(filepath)
+}
+
+type filepathOption string
+
+func (o filepathOption) Apply(config *Config) {
+	viper.AddConfigPath(string(o))
+}
+
 // NewConfig creates a Config struct with a YAML file and applies Option functions to the Config
 // struct.
 func NewConfig(filename string, opts ...Option) (*Config, error) {

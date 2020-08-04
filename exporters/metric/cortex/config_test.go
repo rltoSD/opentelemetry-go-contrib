@@ -198,3 +198,36 @@ func TestNewConfig(t *testing.T) {
 		})
 	}
 }
+
+// TestWithFilepath tests whether NewConfig can find a YAML file that is not in the current
+// directory.
+func TestWithFilepath(t *testing.T) {
+	t.Run("Filepath provided", func(t *testing.T) {
+		// Create YAML file.
+		if err := initYAML(validYAML, "./test1/config.yml"); err != nil {
+			t.Fatalf("Failed to initialize YAML file with error %v", err)
+		}
+		defer os.RemoveAll("./test1")
+
+		// Create new Config struct and verify that an error did not occur
+		_, err := NewConfig("config.yml", WithFilepath("./test1"))
+		if err != nil {
+			t.Fatalf("Received error '%v', wanted '%v'", err, nil)
+		}
+	})
+
+	t.Run("No filepath provided", func(t *testing.T) {
+		// Create YAML file.
+		if err := initYAML(validYAML, "./test2/config.yml"); err != nil {
+			t.Fatalf("Failed to initialize YAML file with error %v", err)
+		}
+		defer os.RemoveAll("./test2")
+
+		// Create new Config struct and verify that an error occurred.
+		_, err := NewConfig("config.yml")
+		if err == nil {
+			t.Fatalf("Should have failed to find YAML file")
+		}
+
+	})
+}
