@@ -66,14 +66,14 @@ func (o clientOption) Apply(config *Config) {
 // struct.
 func NewConfig(filename string, opts ...Option) (*Config, error) {
 	var config Config
-	for _, opt := range opts {
-		opt.Apply(&config)
-	}
 
 	viper.SetConfigName(filename)
 	viper.SetConfigType("yaml")
-	viper.SetConfigName(filename)
 	viper.AddConfigPath(".")
+
+	for _, opt := range opts {
+		opt.Apply(&config)
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
