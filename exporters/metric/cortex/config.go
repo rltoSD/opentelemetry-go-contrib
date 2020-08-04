@@ -8,9 +8,6 @@ import (
 )
 
 var (
-	// ErrNoEndpoint is an error for when the YAML file does not contain the `url` property.
-	ErrNoEndpoint = fmt.Errorf("No endpoint URL found in the YAML file")
-
 	// ErrTwoPasswords is an error for when the YAML file contains both `password` and `password_file`.
 	ErrTwoPasswords = fmt.Errorf("Cannot have two passwords in the YAML file")
 
@@ -90,14 +87,14 @@ func NewConfig(filename string, opts ...Option) (*Config, error) {
 // Validate checks a Config struct for missing required properties and property conflicts.
 // Additionally, it adds default values to missing properties when there is a default.
 func (c *Config) Validate() error {
-	if c.Endpoint == "" {
-		return ErrNoEndpoint
-	}
 	if c.BearerToken != "" && c.BearerTokenFile != "" {
 		return ErrTwoBearerTokens
 	}
 	if c.BasicAuth["password"] != "" && c.BasicAuth["password_file"] != "" {
 		return ErrTwoPasswords
+	}
+	if c.Endpoint == "" {
+		c.Endpoint = "/api/prom/push"
 	}
 	if c.RemoteTimeout == "" {
 		c.RemoteTimeout = "30s"

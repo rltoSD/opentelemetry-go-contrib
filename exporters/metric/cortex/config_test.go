@@ -48,6 +48,7 @@ tls_config:
 // YAML file with both password and password_file properties. It should fail to produce a Config
 // struct since password and password_file are mutually exclusive.
 var noEndpointYAML = []byte(`remote_timeout: 30s
+push_interval: 5s
 name: Valid Config Example
 basic_auth:
   username: user
@@ -116,7 +117,7 @@ var ValidConfig = cortex.Config{
 	},
 	ProxyURL:     "",
 	PushInterval: "5s",
-	Client:       nil,
+	Client:       http.DefaultClient,
 }
 
 // initYAML creates a YAML file at a given filepath. It does not remove any created directories or
@@ -165,8 +166,8 @@ func TestNewConfig(t *testing.T) {
 			"No Endpoint URL",
 			noEndpointYAML,
 			"config.yml",
+			&ValidConfig,
 			nil,
-			cortex.ErrNoEndpoint,
 		},
 		{
 			"Two passwords",
