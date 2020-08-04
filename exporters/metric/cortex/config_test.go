@@ -1,4 +1,4 @@
-package cortex
+package cortex_test
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"opentelemetry.io/contrib/exporters/metric/cortex"
 )
 
 // YAML file that produces a Config struct without errors.
@@ -96,7 +97,7 @@ tls_config:
 `)
 
 // ValidConfig is the resulting Config struct from reading validYAML.
-var ValidConfig = Config{
+var ValidConfig = cortex.Config{
 	Endpoint:      "/api/prom/push",
 	RemoteTimeout: "30s",
 	Name:          "Valid Config Example",
@@ -143,7 +144,7 @@ func TestNewConfig(t *testing.T) {
 		name           string
 		yamlFile       []byte
 		fileName       string
-		expectedConfig *Config
+		expectedConfig *cortex.Config
 		expectedError  error
 	}{
 		{
@@ -165,21 +166,21 @@ func TestNewConfig(t *testing.T) {
 			noEndpointYAML,
 			"config.yml",
 			nil,
-			ErrNoEndpoint,
+			cortex.ErrNoEndpoint,
 		},
 		{
 			"Two passwords",
 			twoPasswordsYAML,
 			"config.yml",
 			nil,
-			ErrTwoPasswords,
+			cortex.ErrTwoPasswords,
 		},
 		{
 			"Two Bearer Tokens",
 			twoBearerTokensYAML,
 			"config.yml",
 			nil,
-			ErrTwoBearerTokens,
+			cortex.ErrTwoBearerTokens,
 		},
 	}
 
@@ -192,7 +193,7 @@ func TestNewConfig(t *testing.T) {
 			defer os.RemoveAll(test.fileName)
 
 			// Create new Config struct and verify errors and contents.
-			config, err := NewConfig(test.fileName)
+			config, err := cortex.NewConfig(test.fileName)
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Received error %v, wanted %v", err, test.expectedError)
 			}
@@ -214,7 +215,7 @@ func TestWithFilepath(t *testing.T) {
 		defer os.RemoveAll("./test1")
 
 		// Create new Config struct and verify that an error did not occur
-		_, err := NewConfig("config.yml", WithFilepath("./test1"))
+		_, err := cortex.NewConfig("config.yml", cortex.WithFilepath("./test1"))
 		if err != nil {
 			t.Fatalf("Received error '%v', wanted '%v'", err, nil)
 		}
@@ -228,7 +229,7 @@ func TestWithFilepath(t *testing.T) {
 		defer os.RemoveAll("./test2")
 
 		// Create new Config struct and verify that an error occurred.
-		_, err := NewConfig("config.yml")
+		_, err := cortex.NewConfig("config.yml")
 		if err == nil {
 			t.Fatalf("Should have failed to find YAML file")
 		}
@@ -246,7 +247,7 @@ func TestWithClient(t *testing.T) {
 
 	// Create a new Config struct with a custom HTTP client.
 	customClient := http.DefaultClient
-	config, _ := NewConfig("config.yml", WithClient(customClient))
+	config, _ := cortex.NewConfig("config.yml", cortex.WithClient(customClient))
 
 	// Verify that the clients are the same.
 	if !cmp.Equal(config.Client, customClient) {
