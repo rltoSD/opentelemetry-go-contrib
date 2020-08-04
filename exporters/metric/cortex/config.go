@@ -102,5 +102,12 @@ func (c *Config) Validate() error {
 	if c.RemoteTimeout == "" {
 		c.RemoteTimeout = "30s"
 	}
+	// Default time interval between pushes for the push controller is 10s.
+	if c.PushInterval == "" {
+		c.PushInterval = "10s"
+	}
+	if c.Client == nil {
+		c.Client = http.DefaultClient
+	}
 	return nil
 }
