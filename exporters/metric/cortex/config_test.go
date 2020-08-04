@@ -93,8 +93,8 @@ tls_config:
   insecure_skip_verify: true
 `)
 
-// configValidStruct is the resulting Config struct from reading validYAML.
-var validConfig = Config{
+// ValidConfig is the resulting Config struct from reading validYAML.
+var ValidConfig = Config{
 	Endpoint:      "/api/prom/push",
 	RemoteTimeout: "30s",
 	Name:          "Valid Config Example",
