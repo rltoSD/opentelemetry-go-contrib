@@ -147,14 +147,14 @@ func TestNewConfig(t *testing.T) {
 			"Valid Config file",
 			validYAML,
 			"config.yml",
-			&validConfig,
+			&ValidConfig,
 			nil,
 		},
 		{
 			"No Timeout",
 			noTimeoutYAML,
 			"config.yml",
-			&validConfig,
+			&ValidConfig,
 			nil,
 		},
 		{
