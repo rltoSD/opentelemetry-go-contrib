@@ -149,6 +149,34 @@ func TestNewConfig(t *testing.T) {
 			&validConfig,
 			nil,
 		},
+		{
+			"No Timeout",
+			noTimeoutYAML,
+			"config.yml",
+			&validConfig,
+			nil,
+		},
+		{
+			"No Endpoint URL",
+			noEndpointYAML,
+			"config.yml",
+			nil,
+			ErrNoEndpoint,
+		},
+		{
+			"Two passwords",
+			twoPasswordsYAML,
+			"config.yml",
+			nil,
+			ErrTwoPasswords,
+		},
+		{
+			"Two Bearer Tokens",
+			twoBearerTokensYAML,
+			"config.yml",
+			nil,
+			ErrTwoBearerTokens,
+		},
 	}
 
 	for _, test := range tests {

@@ -1,6 +1,7 @@
 package cortex
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/spf13/viper"
@@ -43,5 +44,36 @@ func NewConfig(filename string, opts ...Option) (*Config, error) {
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, err
 	}
+	if err := ValidateConfig(&config); err != nil {
+		return nil, err
+	}
 	return &config, nil
+}
+
+// ErrNoEndpoint is an error for when the YAML file does not contain the `url` property.
+var ErrNoEndpoint = fmt.Errorf("No endpoint URL found in the YAML file")
+
+// ErrTwoPasswords is an error for when the YAML file contains both `password` and `password_file`.
+var ErrTwoPasswords = fmt.Errorf("Cannot have two passwords in the YAML file")
+
+// ErrTwoBearerTokens is an error for when the YAML file contains both `bearer_token` and
+// `bearer_token_file`.
+var ErrTwoBearerTokens = fmt.Errorf("Cannot have two bearer tokens in the YAML file")
+
+// ValidateConfig checks a Config struct for missing required properties and property conflicts.
+// Additionally, it adds default values to missing properties when there is a default.
+func ValidateConfig(config *Config) error {
+	if config.Endpoint == "" {
+		return ErrNoEndpoint
+	}
+	if config.BearerToken != "" && config.BearerTokenFile != "" {
+		return ErrTwoBearerTokens
+	}
+	if config.BasicAuth["password"] != "" && config.BasicAuth["password_file"] != "" {
+		return ErrTwoPasswords
+	}
+	if config.RemoteTimeout == "" {
+		config.RemoteTimeout = "30s"
+	}
+	return nil
 }
