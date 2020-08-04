@@ -17,6 +17,7 @@ type Config struct {
 	BearerTokenFile string            `mapstructure:"bearer_token_file"`
 	TLSConfig       map[string]string `mapstructure:"tls_config"`
 	ProxyURL        string            `mapstructure:"proxy_url"`
+	PushInterval    string            `mapstructure:"push_interval"`
 	Client          *http.Client
 }
 

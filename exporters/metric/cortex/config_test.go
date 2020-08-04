@@ -14,6 +14,7 @@ import (
 // YAML file that produces a Config struct without errors.
 var validYAML = []byte(`url: /api/prom/push
 remote_timeout: 30s
+push_interval: 5s
 name: Valid Config Example
 basic_auth:
   username: user
@@ -29,6 +30,7 @@ tls_config:
 
 // YAML file with no remote_timout property. It should produce a Config struct without errors.
 var noTimeoutYAML = []byte(`url: /api/prom/push
+push_interval: 5s
 name: Valid Config Example
 basic_auth:
   username: user
@@ -111,8 +113,9 @@ var ValidConfig = Config{
 		"server_name":          "server",
 		"insecure_skip_verify": "1",
 	},
-	ProxyURL: "",
-	Client:   nil,
+	ProxyURL:     "",
+	PushInterval: "5s",
+	Client:       nil,
 }
 
 // initYAML creates a YAML file at a given filepath. It does not remove any created directories or
