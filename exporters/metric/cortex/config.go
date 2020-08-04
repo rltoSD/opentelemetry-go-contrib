@@ -36,6 +36,19 @@ func (o filepathOption) Apply(config *Config) {
 	viper.AddConfigPath(string(o))
 }
 
+// WithClient adds a custom http.Client to the Config struct.
+func WithClient(client *http.Client) Option {
+	return clientOption{client}
+}
+
+type clientOption struct {
+	client *http.Client
+}
+
+func (o clientOption) Apply(config *Config) {
+	config.Client = (*http.Client)(o.client)
+}
+
 // NewConfig creates a Config struct with a YAML file and applies Option functions to the Config
 // struct.
 func NewConfig(filename string, opts ...Option) (*Config, error) {

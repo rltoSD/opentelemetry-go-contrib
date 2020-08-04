@@ -3,6 +3,7 @@ package cortex
 import (
 	"errors"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -230,4 +231,22 @@ func TestWithFilepath(t *testing.T) {
 		}
 
 	})
+}
+
+// TestWithClient tests whether NewConfig successfully adds a HTTP client to the Config struct.
+func TestWithClient(t *testing.T) {
+	// Create a YAML file.
+	if err := initYAML(validYAML, "./config.yml"); err != nil {
+		t.Errorf("Failed to initialize YAML file with error %v", err)
+	}
+	defer os.RemoveAll("config.yml")
+
+	// Create a new Config struct with a custom HTTP client.
+	customClient := http.DefaultClient
+	config, _ := NewConfig("config.yml", WithClient(customClient))
+
+	// Verify that the clients are the same.
+	if !cmp.Equal(config.Client, customClient) {
+		t.Fatalf("Received client %v, wanted %v", *config.Client, *customClient)
+	}
 }
