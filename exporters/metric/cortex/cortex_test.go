@@ -31,3 +31,13 @@ func TestNewRawExporter(t *testing.T) {
 		t.Errorf("Got configuration %v, wanted %v", exporter.Config, ValidConfig)
 	}
 }
+
+// TestNewExportPipeline tests whether a push Controller was successfully created with an Exporter
+// from New RawExporter. Errors in this function will be from calls to push controller package and
+// NewRawExport. Both have their own tests.
+func TestNewExportPipeline(t *testing.T) {
+	_, err := cortex.NewExportPipeline(ValidConfig)
+	if err != nil {
+		t.Errorf("Failed to create export pipeline with error %v", err)
+	}
+}
