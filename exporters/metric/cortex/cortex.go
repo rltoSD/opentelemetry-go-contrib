@@ -13,7 +13,7 @@ import (
 
 // Exporter forwards metrics to a Cortex
 type Exporter struct {
-	Config
+	config Config
 }
 
 // ExportKindFor returns CumulativeExporter so the Processor correctly aggregates data
