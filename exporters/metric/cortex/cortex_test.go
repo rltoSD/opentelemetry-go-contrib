@@ -1,6 +1,7 @@
 package cortex_test
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -52,5 +53,38 @@ func TestInstallNewPipeline(t *testing.T) {
 	}
 	if global.MeterProvider() != pusher.Provider() {
 		t.Fatalf("Failed to register push Controller provider globally")
+	}
+}
+
+// TestAddHeaders tests whether the correct headers are correctly added to an http request.
+// Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
+func TestAddHeaders(t *testing.T) {
+	// Make a fake Config struct and Exporter for testing.
+	testConfig := cortex.Config{
+		Headers: map[string]string{
+			"testHeader":    "testField",
+			"TestHeaderTwo": "testFieldTwo",
+		},
+	}
+	exporter := cortex.Exporter{testConfig}
+
+	// Create http request to add headers to.
+	req, err := http.NewRequest("POST", "test.com", nil)
+	if err != nil {
+		t.Errorf("Failed to create http request with error %v", err)
+	}
+	exporter.AddHeaders(req)
+
+	// Check that all the headers are there.
+	for name, field := range testConfig.Headers {
+		if req.Header.Get(name) != field {
+			t.Errorf("Failed to add header: '%v' from Config.Headers", name)
+		}
+	}
+	if req.Header.Get("Content-Encoding") != "snappy" {
+		t.Errorf("Failed to add required header 'Content-Encoding'")
+	}
+	if req.Header.Get("Content-Type") != "application/x-protobuf" {
+		t.Errorf("Failed to add required header 'Content-Encoding'")
 	}
 }

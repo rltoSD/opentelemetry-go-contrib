@@ -2,6 +2,7 @@ package cortex
 
 import (
 	"context"
+	"net/http"
 
 	"go.opentelemetry.io/otel/api/global"
 	apimetric "go.opentelemetry.io/otel/api/metric"
@@ -61,4 +62,17 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 	}
 	global.SetMeterProvider(pusher.Provider())
 	return pusher, nil
+}
+
+// AddHeaders adds required headers as well as all headers in Header map to a http request.
+func (e *Exporter) AddHeaders(req *http.Request) {
+	// Cortex expects Snappy-compressed protobuf messages. These two headers are hard-coded as they
+	// should be on every request.
+	req.Header.Add("Content-Encoding", "snappy")
+	req.Header.Set("Content-Type", "application/x-protobuf")
+
+	// Add all user-supplied headers to the request.
+	for name, field := range e.Headers {
+		req.Header.Add(name, field)
+	}
 }
