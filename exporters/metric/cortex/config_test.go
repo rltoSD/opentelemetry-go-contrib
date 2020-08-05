@@ -2,13 +2,12 @@ package cortex_test
 
 import (
 	"errors"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/afero"
 	"opentelemetry.io/contrib/exporters/metric/cortex"
 )
 
@@ -120,22 +119,22 @@ var ValidConfig = cortex.Config{
 	Client:       http.DefaultClient,
 }
 
-// initYAML creates a YAML file at a given filepath. It does not remove any created directories or
-// files.
-func initYAML(yamlBytes []byte, path string) error {
+// initYAML creates a YAML file at a given filepath in a in-memory file system.
+func initYAML(yamlBytes []byte, path string) (afero.Fs, error) {
+	// Create an in-memory file system.
+	fs := afero.NewMemMapFs()
+
+	// Retrieve the directory from the filepath.
 	dirPath := filepath.Dir(path)
 
-	err := os.MkdirAll(dirPath, 0755)
-	if err != nil {
-		return err
+	if err := fs.MkdirAll(dirPath, 0755); err != nil {
+		return nil, err
+	}
+	if err := afero.WriteFile(fs, path, yamlBytes, 0644); err != nil {
+		return nil, err
 	}
 
-	err = ioutil.WriteFile(path, yamlBytes, 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return fs, nil
 }
 
 // TestNewConfig tests whether NewConfig returns a correct Config struct. It checks whether the YAML
@@ -187,14 +186,14 @@ func TestNewConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Create YAML file in the current directory.
-			if err := initYAML(test.yamlFile, test.fileName); err != nil {
+			// Create YAML file.
+			fs, err := initYAML(test.yamlFile, "/test/"+test.fileName)
+			if err != nil {
 				t.Fatalf("Failed to initialize YAML file with error %v", err)
 			}
-			defer os.RemoveAll(test.fileName)
 
 			// Create new Config struct and verify errors and contents.
-			config, err := cortex.NewConfig(test.fileName)
+			config, err := cortex.NewConfig(test.fileName, cortex.WithFilepath("/test"), cortex.WithFileSystem(fs))
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("Received error %v, wanted %v", err, test.expectedError)
 			}
@@ -210,13 +209,13 @@ func TestNewConfig(t *testing.T) {
 func TestWithFilepath(t *testing.T) {
 	t.Run("Filepath provided", func(t *testing.T) {
 		// Create YAML file.
-		if err := initYAML(validYAML, "./test1/config.yml"); err != nil {
+		fs, err := initYAML(validYAML, "/test1/config.yml")
+		if err != nil {
 			t.Fatalf("Failed to initialize YAML file with error %v", err)
 		}
-		defer os.RemoveAll("./test1")
 
 		// Create new Config struct and verify that an error did not occur
-		_, err := cortex.NewConfig("config.yml", cortex.WithFilepath("./test1"))
+		_, err = cortex.NewConfig("config.yml", cortex.WithFilepath("/test1"), cortex.WithFileSystem(fs))
 		if err != nil {
 			t.Fatalf("Received error '%v', wanted '%v'", err, nil)
 		}
@@ -224,13 +223,13 @@ func TestWithFilepath(t *testing.T) {
 
 	t.Run("No filepath provided", func(t *testing.T) {
 		// Create YAML file.
-		if err := initYAML(validYAML, "./test2/config.yml"); err != nil {
+		fs, err := initYAML(validYAML, "/test2/config.yml")
+		if err != nil {
 			t.Fatalf("Failed to initialize YAML file with error %v", err)
 		}
-		defer os.RemoveAll("./test2")
 
 		// Create new Config struct and verify that an error occurred.
-		_, err := cortex.NewConfig("config.yml")
+		_, err = cortex.NewConfig("config.yml", cortex.WithFileSystem(fs))
 		if err == nil {
 			t.Fatalf("Should have failed to find YAML file")
 		}
@@ -241,14 +240,14 @@ func TestWithFilepath(t *testing.T) {
 // TestWithClient tests whether NewConfig successfully adds a HTTP client to the Config struct.
 func TestWithClient(t *testing.T) {
 	// Create a YAML file.
-	if err := initYAML(validYAML, "./config.yml"); err != nil {
+	fs, err := initYAML(validYAML, "/test/config.yml")
+	if err != nil {
 		t.Errorf("Failed to initialize YAML file with error %v", err)
 	}
-	defer os.RemoveAll("config.yml")
 
 	// Create a new Config struct with a custom HTTP client.
 	customClient := http.DefaultClient
-	config, _ := cortex.NewConfig("config.yml", cortex.WithClient(customClient))
+	config, _ := cortex.NewConfig("config.yml", cortex.WithClient(customClient), cortex.WithFilepath("/test"), cortex.WithFileSystem(fs))
 
 	// Verify that the clients are the same.
 	if !cmp.Equal(config.Client, customClient) {

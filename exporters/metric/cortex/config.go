@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 )
 
@@ -59,11 +60,26 @@ func (o clientOption) Apply(config *Config) {
 	config.Client = (*http.Client)(o.client)
 }
 
+// WithFileSystem tells Viper which file system to search for the YAML file in. This is used for
+// testing with an in-memory file system.
+func WithFileSystem(fs afero.Fs) Option {
+	return fsOption{fs}
+}
+
+type fsOption struct {
+	fs afero.Fs
+}
+
+func (o fsOption) Apply(config *Config) {
+	viper.SetFs(o.fs)
+}
+
 // NewConfig creates a Config struct with a YAML file and applies Option functions to the Config
 // struct.
 func NewConfig(filename string, opts ...Option) (*Config, error) {
 	var config Config
 
+	viper.SetFs(afero.NewOsFs())
 	viper.SetConfigName(filename)
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
