@@ -3,6 +3,7 @@ package cortex
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/api/global"
 	apimetric "go.opentelemetry.io/otel/api/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
@@ -49,5 +50,15 @@ func NewExportPipeline(config Config, options ...push.Option) (*push.Controller,
 		options...,
 	)
 	pusher.Start()
+	return pusher, nil
+}
+
+// InstallNewPipeline registers a push Controller's Provider globally.
+func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller, error) {
+	pusher, err := NewExportPipeline(config, options...)
+	if err != nil {
+		return nil, err
+	}
+	global.SetMeterProvider(pusher.Provider())
 	return pusher, nil
 }

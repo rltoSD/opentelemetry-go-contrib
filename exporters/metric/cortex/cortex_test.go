@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
 	"opentelemetry.io/contrib/exporters/metric/cortex"
@@ -39,5 +40,17 @@ func TestNewExportPipeline(t *testing.T) {
 	_, err := cortex.NewExportPipeline(ValidConfig)
 	if err != nil {
 		t.Errorf("Failed to create export pipeline with error %v", err)
+	}
+}
+
+// TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push Controller
+// and whether that controller's Provider is registered globally.
+func TestInstallNewPipeline(t *testing.T) {
+	pusher, err := cortex.InstallNewPipeline(ValidConfig)
+	if err != nil {
+		t.Errorf("Failed to create install pipeline with error %v", err)
+	}
+	if global.MeterProvider() != pusher.Provider() {
+		t.Errorf("Failed to register push Controller provider globally")
 	}
 }
