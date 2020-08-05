@@ -15,6 +15,14 @@ var (
 	// ErrTwoBearerTokens is an error for when the YAML file contains both `bearer_token` and
 	// `bearer_token_file`.
 	ErrTwoBearerTokens = fmt.Errorf("Cannot have two bearer tokens in the YAML file")
+
+	// ErrNoTenantID is an error for when the YAML file does not contain `tenant_id`. Cortex
+	// requires a tenant id header on each request.
+	ErrNoTenantID = fmt.Errorf("Tenant id is missing from the YAML file")
+
+	// ErrNoXPrometheusRemoteWriteVersion is an error for when the YAML file does not contain
+	// `x_prometheus_remote_write_version`. HTTP requests should contain a header with the version.
+	ErrNoXPrometheusRemoteWriteVersion = fmt.Errorf("No X-Prometheus-Remote-Write-Version found in YAML file")
 )
 
 // Config contains properties the Exporter uses to export metrics data to Cortex.
@@ -28,6 +36,7 @@ type Config struct {
 	TLSConfig       map[string]string `mapstructure:"tls_config"`
 	ProxyURL        string            `mapstructure:"proxy_url"`
 	PushInterval    string            `mapstructure:"push_interval"`
+	Headers         map[string]string `mapstructure:"headers"`
 	Client          *http.Client
 }
 
@@ -111,6 +120,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Endpoint == "" {
 		c.Endpoint = "/api/prom/push"
+	}
+	if c.Headers["x-prometheus-remote-write-version"] == "" {
+		return ErrNoXPrometheusRemoteWriteVersion
+	}
+	if c.Headers["tenant-id"] == "" {
+		return ErrNoTenantID
 	}
 	if c.RemoteTimeout == "" {
 		c.RemoteTimeout = "30s"

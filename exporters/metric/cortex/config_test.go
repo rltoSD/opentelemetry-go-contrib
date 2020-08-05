@@ -26,6 +26,9 @@ tls_config:
   key_file: keyfile
   server_name: server
   insecure_skip_verify: true
+headers:
+  "X-Prometheus-Remote-Write-Version": "0.1.0"
+  "tenant-ID": "123"
 `)
 
 // YAML file with no remote_timout property. It should produce a Config struct without errors.
@@ -42,6 +45,9 @@ tls_config:
   key_file: keyfile
   server_name: server
   insecure_skip_verify: true
+headers:
+  "X-Prometheus-Remote-Write-Version": "0.1.0"
+  "tenant-ID": "123"
 `)
 
 // YAML file with both password and password_file properties. It should fail to produce a Config
@@ -59,6 +65,46 @@ tls_config:
   key_file: keyfile
   server_name: server
   insecure_skip_verify: true
+headers:
+  "X-Prometheus-Remote-Write-Version": "0.1.0"
+  "tenant-ID": "123"
+`)
+
+// YAML file with no tenant ID property. It should fail to produce a Config struct.
+var noXPrometheusRemoteWriteVersionYAML = []byte(`remote_timeout: 30s
+push_interval: 5s
+name: Valid Config Example
+basic_auth:
+  username: user
+  password: password
+bearer_token: qwerty12345
+tls_config:
+  ca_file: cafile
+  cert_file: certfile
+  key_file: keyfile
+  server_name: server
+  insecure_skip_verify: true
+headers:
+  "tenant-ID": "123"
+`)
+
+// YAML file with no X-Prometheus-Remote-Write-Version. It should fail to produce a Config
+// struct since X-Prometheus-Remote-Write-Version is a required header.
+var noTenantIDYAML = []byte(`remote_timeout: 30s
+push_interval: 5s
+name: Valid Config Example
+basic_auth:
+  username: user
+  password: password
+bearer_token: qwerty12345
+tls_config:
+  ca_file: cafile
+  cert_file: certfile
+  key_file: keyfile
+  server_name: server
+  insecure_skip_verify: true
+headers:
+  "X-Prometheus-Remote-Write-Version": "0.1.0"
 `)
 
 // YAML file with both bearer_token and bearer_token_file properties. It should fail to produce a
@@ -116,7 +162,11 @@ var ValidConfig = cortex.Config{
 	},
 	ProxyURL:     "",
 	PushInterval: "5s",
-	Client:       http.DefaultClient,
+	Headers: map[string]string{
+		"x-prometheus-remote-write-version": "0.1.0",
+		"tenant-id":                         "123",
+	},
+	Client: http.DefaultClient,
 }
 
 // initYAML creates a YAML file at a given filepath in a in-memory file system.
@@ -167,6 +217,20 @@ func TestNewConfig(t *testing.T) {
 			"config.yml",
 			&ValidConfig,
 			nil,
+		},
+		{
+			"No X-Prometheus-Remote-Write-Version",
+			noXPrometheusRemoteWriteVersionYAML,
+			"config.yml",
+			nil,
+			cortex.ErrNoXPrometheusRemoteWriteVersion,
+		},
+		{
+			"No Tenant ID",
+			noTenantIDYAML,
+			"config.yml",
+			nil,
+			cortex.ErrNoTenantID,
 		},
 		{
 			"Two passwords",
