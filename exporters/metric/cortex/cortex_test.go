@@ -25,11 +25,11 @@ func TestExportKindFor(t *testing.T) {
 func TestNewRawExporter(t *testing.T) {
 	exporter, err := cortex.NewRawExporter(ValidConfig)
 	if err != nil {
-		t.Errorf("Failed to create exporter with error %v", err)
+		t.Fatalf("Failed to create exporter with error %v", err)
 	}
 
 	if !cmp.Equal(ValidConfig, exporter.Config) {
-		t.Errorf("Got configuration %v, wanted %v", exporter.Config, ValidConfig)
+		t.Fatalf("Got configuration %v, wanted %v", exporter.Config, ValidConfig)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestNewRawExporter(t *testing.T) {
 func TestNewExportPipeline(t *testing.T) {
 	_, err := cortex.NewExportPipeline(ValidConfig)
 	if err != nil {
-		t.Errorf("Failed to create export pipeline with error %v", err)
+		t.Fatalf("Failed to create export pipeline with error %v", err)
 	}
 }
 
@@ -48,9 +48,9 @@ func TestNewExportPipeline(t *testing.T) {
 func TestInstallNewPipeline(t *testing.T) {
 	pusher, err := cortex.InstallNewPipeline(ValidConfig)
 	if err != nil {
-		t.Errorf("Failed to create install pipeline with error %v", err)
+		t.Fatalf("Failed to create install pipeline with error %v", err)
 	}
 	if global.MeterProvider() != pusher.Provider() {
-		t.Errorf("Failed to register push Controller provider globally")
+		t.Fatalf("Failed to register push Controller provider globally")
 	}
 }
