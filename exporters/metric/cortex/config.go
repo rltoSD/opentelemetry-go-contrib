@@ -88,15 +88,16 @@ func (o fsOption) Apply(config *Config) {
 func NewConfig(filename string, opts ...Option) (*Config, error) {
 	var config Config
 
+	// Use OS file system and look for YAML file in local directory by default.
 	viper.SetFs(afero.NewOsFs())
 	viper.SetConfigName(filename)
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
-
 	for _, opt := range opts {
 		opt.Apply(&config)
 	}
 
+	// Read YAML file into struct and then check its properties.
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
 	}
@@ -112,12 +113,15 @@ func NewConfig(filename string, opts ...Option) (*Config, error) {
 // Validate checks a Config struct for missing required properties and property conflicts.
 // Additionally, it adds default values to missing properties when there is a default.
 func (c *Config) Validate() error {
+	// Check for mutually exclusive properties.
 	if c.BearerToken != "" && c.BearerTokenFile != "" {
 		return ErrTwoBearerTokens
 	}
 	if c.BasicAuth["password"] != "" && c.BasicAuth["password_file"] != "" {
 		return ErrTwoPasswords
 	}
+
+	// Add default values for missing properties.
 	if c.Endpoint == "" {
 		c.Endpoint = "/api/prom/push"
 	}

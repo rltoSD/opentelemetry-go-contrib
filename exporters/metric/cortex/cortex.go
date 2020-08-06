@@ -19,7 +19,7 @@ import (
 
 // Exporter forwards metrics to a Cortex
 type Exporter struct {
-	Config
+	Config Config
 }
 
 // ExportKindFor returns CumulativeExporter so the Processor correctly aggregates data
@@ -77,7 +77,7 @@ func (e *Exporter) AddHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
 	// Add all user-supplied headers to the request.
-	for name, field := range e.Headers {
+	for name, field := range e.Config.Headers {
 		req.Header.Add(name, field)
 	}
 }
@@ -86,7 +86,7 @@ func (e *Exporter) AddHeaders(req *http.Request) {
 func (e *Exporter) BuildRequest(message []byte) (*http.Request, error) {
 	// Create the request with the endpoint and message. The message should be a Snappy-compressed
 	// protobuf message.
-	req, err := http.NewRequest("POST", e.Endpoint, bytes.NewBuffer(message))
+	req, err := http.NewRequest("POST", e.Config.Endpoint, bytes.NewBuffer(message))
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ var ErrRetryLimitReached = fmt.Errorf("Failed to send request after reaching ret
 // SendRequest sends an http request using the Exporter's http Client. It will retry once
 func (e *Exporter) SendRequest(req *http.Request, retryCount int) (int, error) {
 	// Attempt to send request.
-	res, err := e.Client.Do(req)
+	res, err := e.Config.Client.Do(req)
 	if err != nil {
 		return -1, err
 	}

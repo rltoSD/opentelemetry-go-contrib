@@ -127,7 +127,7 @@ func TestBuildRequest(t *testing.T) {
 	}
 
 	// Verify headers.
-	for name, field := range exporter.Headers {
+	for name, field := range exporter.Config.Headers {
 		// Headers are case-insensitive; Viper converts all keys to lower-case.
 		lowercaseName := strings.ToLower(name)
 		if req.Header.Get(lowercaseName) != field {
