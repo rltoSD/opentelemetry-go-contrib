@@ -3,6 +3,7 @@ package cortex
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/golang/protobuf/proto"
@@ -113,4 +114,32 @@ func (e *Exporter) BuildMessage(timeseries []*prompb.TimeSeries) ([]byte, error)
 	compressed := snappy.Encode(message, nil)
 
 	return compressed, nil
+}
+
+// Default number of times to retry sending a request upon failure.
+var maxRetryCount = 1
+
+// ErrRetryLimitReached is an error for when the Exporter fails to send the request after more than
+// `maxRetryCount` times.
+var ErrRetryLimitReached = fmt.Errorf("Failed to send request after reaching retry limit")
+
+// SendRequest sends an http request using the Exporter's http Client. It will retry once
+func (e *Exporter) SendRequest(req *http.Request, retryCount int) (int, error) {
+	// Attempt to send request.
+	res, err := e.Client.Do(req)
+	if err != nil {
+		return -1, err
+	}
+
+	// Request was successfully sent if the request status code is 2xx.
+	if res.StatusCode >= 200 && res.StatusCode <= 299 {
+		return res.StatusCode, nil
+	}
+
+	// Retry up to `maxRetryCount`. Otherwise, return an error.
+	retryCount++
+	if retryCount > maxRetryCount {
+		return res.StatusCode, ErrRetryLimitReached
+	}
+	return e.SendRequest(req, retryCount)
 }

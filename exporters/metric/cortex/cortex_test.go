@@ -1,8 +1,10 @@
 package cortex_test
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -153,5 +155,86 @@ func TestBuildMessage(t *testing.T) {
 	_, err := exporter.BuildMessage(timeseries)
 	if err != nil {
 		t.Errorf("Failed to build Snappy-compressed protobuf message with error %v", err)
+	}
+}
+
+// TestSendRequest tests if the Exporter can successfully send a http request as well as the retry
+// functionality by creating a test server and sending requests to it using SendRequest(). The test
+// server will imitate a failure by returning status code 404 a test-specified amount of times.
+// Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
+func TestSendRequest(t *testing.T) {
+	tests := []struct {
+		name               string
+		expectedStatusCode int
+		expectedError      error
+		numFailures        int
+	}{
+		{
+			"Successful Export",
+			200,
+			nil,
+			0,
+		},
+		{
+			"Fails Export once",
+			200,
+			nil,
+			1,
+		},
+		{
+			"Fail Export twice",
+			404,
+			cortex.ErrRetryLimitReached,
+			2,
+		},
+	}
+
+	// This value will be set in the testing loop and is used by the handler function.
+	failureCount := 0
+
+	// Set up a test server to receive data. The handler function will return status code
+	// 404 and decrement this value until it reaches 0, when it returns status code 200.
+	handler := func(rw http.ResponseWriter, req *http.Request) {
+		if failureCount > 0 {
+			failureCount--
+			rw.WriteHeader(http.StatusNotFound)
+		} else {
+			rw.WriteHeader(http.StatusOK)
+		}
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	defer server.Close()
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Set number of times the server will return 404 on.
+			failureCount = test.numFailures
+
+			// Set up an Exporter that uses the test server's endpoint.
+			customConfig := ValidConfig
+			customConfig.Endpoint = server.URL
+			exporter := cortex.Exporter{customConfig}
+
+			// Create an empty Snappy-compressed message.
+			msg, err := exporter.BuildMessage([]*prompb.TimeSeries{})
+			if err != nil {
+				t.Fatalf("Failed to build Snappy-compressed protobuf message with error %v", err)
+			}
+
+			// Create a http POST request with the compressed message.
+			req, err := exporter.BuildRequest(msg)
+			if err != nil {
+				t.Fatalf("Failed to build request with error %v", err)
+			}
+
+			// Send the request to the test server and verify errors and status codes.
+			statusCode, err := exporter.SendRequest(req, 0)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("Wanted error %v, received error %v", test.expectedError, err)
+			}
+			if statusCode != test.expectedStatusCode {
+				t.Errorf("Wanted status code %v, received status code %v instead", test.expectedStatusCode, statusCode)
+			}
+		})
 	}
 }
