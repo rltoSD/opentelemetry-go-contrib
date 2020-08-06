@@ -1,6 +1,7 @@
 package cortex
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 
@@ -75,4 +76,19 @@ func (e *Exporter) AddHeaders(req *http.Request) {
 	for name, field := range e.Headers {
 		req.Header.Add(name, field)
 	}
+}
+
+// BuildRequest creates an http POST request with a []byte as the body and headers attached.
+func (e *Exporter) BuildRequest(message []byte) (*http.Request, error) {
+	// Create the request with the endpoint and message. The message should be a Snappy-compressed
+	// protobuf message.
+	req, err := http.NewRequest("POST", e.Endpoint, bytes.NewBuffer(message))
+	if err != nil {
+		return nil, err
+	}
+
+	// Add the required headers and the headers from Config.Headers.
+	e.AddHeaders(req)
+
+	return req, nil
 }

@@ -1,7 +1,9 @@
 package cortex_test
 
 import (
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -77,7 +79,54 @@ func TestAddHeaders(t *testing.T) {
 
 	// Check that all the headers are there.
 	for name, field := range testConfig.Headers {
-		if req.Header.Get(name) != field {
+		// Headers are case-insensitive; Viper converts all keys to lower-case.
+		lowercaseName := strings.ToLower(name)
+		if req.Header.Get(lowercaseName) != field {
+			t.Errorf("Failed to add header: '%v' from Config.Headers", name)
+		}
+	}
+	if req.Header.Get("Content-Encoding") != "snappy" {
+		t.Errorf("Failed to add required header 'Content-Encoding'")
+	}
+	if req.Header.Get("Content-Type") != "application/x-protobuf" {
+		t.Errorf("Failed to add required header 'Content-Encoding'")
+	}
+}
+
+// TestBuildRequest tests whether a http request is a POST request, has the correct body, and has
+// the correct headers.
+// Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
+func TestBuildRequest(t *testing.T) {
+	// Make fake exporter and message for testing.
+	var testMessage = []byte(`Test Message!`)
+	exporter := cortex.Exporter{ValidConfig}
+
+	// Create the http request.
+	req, err := exporter.BuildRequest(testMessage)
+	if err != nil {
+		t.Fatalf("Failed to build request with error %v", err)
+	}
+
+	// Verify the http method, url, and body.
+	if req.Method != http.MethodPost {
+		t.Errorf("Request is of method %v, wanted POST", req.Method)
+	}
+	if req.URL.String() != ValidConfig.Endpoint {
+		t.Errorf("Request has endpoint %v, wanted %v", req.URL, ValidConfig.Endpoint)
+	}
+	reqMessage, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Errorf("Failed to read request body with error %v", err)
+	}
+	if !cmp.Equal(reqMessage, testMessage) {
+		t.Errorf("Request body has message %v, wanted %v", reqMessage, testMessage)
+	}
+
+	// Verify headers.
+	for name, field := range exporter.Headers {
+		// Headers are case-insensitive; Viper converts all keys to lower-case.
+		lowercaseName := strings.ToLower(name)
+		if req.Header.Get(lowercaseName) != field {
 			t.Errorf("Failed to add header: '%v' from Config.Headers", name)
 		}
 	}
