@@ -174,9 +174,10 @@ func initYAML(yamlBytes []byte, path string) (afero.Fs, error) {
 	// Create an in-memory file system.
 	fs := afero.NewMemMapFs()
 
-	// Retrieve the directory from the filepath.
+	// Retrieve the directory path.
 	dirPath := filepath.Dir(path)
 
+	// Create the directory and then the file.
 	if err := fs.MkdirAll(dirPath, 0755); err != nil {
 		return nil, err
 	}
