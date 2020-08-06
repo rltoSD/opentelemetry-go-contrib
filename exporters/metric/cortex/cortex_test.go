@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/prometheus/prompb"
+
 	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/sdk/export/metric"
@@ -135,5 +137,21 @@ func TestBuildRequest(t *testing.T) {
 	}
 	if req.Header.Get("Content-Type") != "application/x-protobuf" {
 		t.Errorf("Failed to add required header 'Content-Encoding'")
+	}
+}
+
+// TestBuildMessage tests whether BuildMessage successfully returns a Snappy-compressed protobuf
+// message.
+// Note: Not too sure how to test this function.
+func TestBuildMessage(t *testing.T) {
+	exporter := cortex.Exporter{ValidConfig}
+	timeseries := []*prompb.TimeSeries{}
+
+	// BuildMessage simply calls protobuf.Marshal() and snappy.Encode(). BuildMessage returns the
+	// error returned by these two functions, which have their own tests in their respective
+	// packages. As long as no error is returned, the function should work as expected.
+	_, err := exporter.BuildMessage(timeseries)
+	if err != nil {
+		t.Errorf("Failed to build Snappy-compressed protobuf message with error %v", err)
 	}
 }

@@ -5,6 +5,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/prompb"
 	"go.opentelemetry.io/otel/api/global"
 	apimetric "go.opentelemetry.io/otel/api/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric"
@@ -91,4 +94,23 @@ func (e *Exporter) BuildRequest(message []byte) (*http.Request, error) {
 	e.AddHeaders(req)
 
 	return req, nil
+}
+
+// BuildMessage creates a Snappy-compressed protobuf message from a slice of TimeSeries.
+func (e *Exporter) BuildMessage(timeseries []*prompb.TimeSeries) ([]byte, error) {
+	// Wrap the TimeSeries as a WriteRequest since Cortex requires it.
+	writeRequest := &prompb.WriteRequest{
+		Timeseries: timeseries,
+	}
+
+	// Convert the struct to a slice of bytes.
+	message, err := proto.Marshal(writeRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compress the message.
+	compressed := snappy.Encode(message, nil)
+
+	return compressed, nil
 }
