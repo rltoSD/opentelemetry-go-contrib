@@ -91,7 +91,6 @@ func TestInstallNewPipeline(t *testing.T) {
 }
 
 // TestAddHeaders tests whether the correct headers are correctly added to an http request.
-// Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
 func TestAddHeaders(t *testing.T) {
 	// Make a fake Config struct and Exporter for testing.
 	testConfig := Config{
@@ -104,30 +103,21 @@ func TestAddHeaders(t *testing.T) {
 
 	// Create http request to add headers to.
 	req, err := http.NewRequest("POST", "test.com", nil)
-	if err != nil {
-		t.Errorf("Failed to create http request with error %v", err)
-	}
+	require.Nil(t, err)
 	exporter.addHeaders(req)
 
 	// Check that all the headers are there.
 	for name, field := range testConfig.Headers {
 		// Headers are case-insensitive; Viper converts all keys to lower-case.
 		lowercaseName := strings.ToLower(name)
-		if req.Header.Get(lowercaseName) != field {
-			t.Errorf("Failed to add header: '%v' from Config.Headers", name)
-		}
+		require.Equal(t, req.Header.Get(lowercaseName), field)
 	}
-	if req.Header.Get("Content-Encoding") != "snappy" {
-		t.Errorf("Failed to add required header 'Content-Encoding'")
-	}
-	if req.Header.Get("Content-Type") != "application/x-protobuf" {
-		t.Errorf("Failed to add required header 'Content-Encoding'")
-	}
+	require.Equal(t, req.Header.Get("Content-Encoding"), "snappy")
+	require.Equal(t, req.Header.Get("Content-Type"), "application/x-protobuf")
 }
 
 // TestBuildRequest tests whether a http request is a POST request, has the correct body, and has
 // the correct headers.
-// Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
 func TestBuildRequest(t *testing.T) {
 	// Make fake exporter and message for testing.
 	var testMessage = []byte(`Test Message!`)
@@ -135,44 +125,28 @@ func TestBuildRequest(t *testing.T) {
 
 	// Create the http request.
 	req, err := exporter.buildRequest(testMessage)
-	if err != nil {
-		t.Fatalf("Failed to build request with error %v", err)
-	}
+	require.Nil(t, err)
 
 	// Verify the http method, url, and body.
-	if req.Method != http.MethodPost {
-		t.Errorf("Request is of method %v, wanted POST", req.Method)
-	}
-	if req.URL.String() != validConfig.Endpoint {
-		t.Errorf("Request has endpoint %v, wanted %v", req.URL, validConfig.Endpoint)
-	}
+	require.Equal(t, req.Method, http.MethodPost)
+	require.Equal(t, req.URL.String(), validConfig.Endpoint)
+
 	reqMessage, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		t.Errorf("Failed to read request body with error %v", err)
-	}
-	if !cmp.Equal(reqMessage, testMessage) {
-		t.Errorf("Request body has message %v, wanted %v", reqMessage, testMessage)
-	}
+	require.Nil(t, err)
+	require.Equal(t, reqMessage, testMessage)
 
 	// Verify headers.
 	for name, field := range exporter.config.Headers {
 		// Headers are case-insensitive; Viper converts all keys to lower-case.
 		lowercaseName := strings.ToLower(name)
-		if req.Header.Get(lowercaseName) != field {
-			t.Errorf("Failed to add header: '%v' from Config.Headers", name)
-		}
+		require.Equal(t, req.Header.Get(lowercaseName), field)
 	}
-	if req.Header.Get("Content-Encoding") != "snappy" {
-		t.Errorf("Failed to add required header 'Content-Encoding'")
-	}
-	if req.Header.Get("Content-Type") != "application/x-protobuf" {
-		t.Errorf("Failed to add required header 'Content-Encoding'")
-	}
+	require.Equal(t, req.Header.Get("Content-Encoding"), "snappy")
+	require.Equal(t, req.Header.Get("Content-Type"), "application/x-protobuf")
 }
 
 // TestBuildMessage tests whether BuildMessage successfully returns a Snappy-compressed protobuf
 // message.
-// Note: Not too sure how to test this function.
 func TestBuildMessage(t *testing.T) {
 	exporter := Exporter{validConfig}
 	timeseries := []*prompb.TimeSeries{}
@@ -181,9 +155,7 @@ func TestBuildMessage(t *testing.T) {
 	// error returned by these two functions, which have their own tests in their respective
 	// packages. As long as no error is returned, the function should work as expected.
 	_, err := exporter.buildMessage(timeseries)
-	if err != nil {
-		t.Errorf("Failed to build Snappy-compressed protobuf message with error %v", err)
-	}
+	require.Nil(t, err)
 }
 
 // TestSendRequest tests if the Exporter can successfully send a http request with a correctly
