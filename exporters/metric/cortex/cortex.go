@@ -112,7 +112,7 @@ func (e *Exporter) BuildMessage(timeseries []*prompb.TimeSeries) ([]byte, error)
 	}
 
 	// Compress the message.
-	compressed := snappy.Encode(message, nil)
+	compressed := snappy.Encode(nil, message)
 
 	return compressed, nil
 }

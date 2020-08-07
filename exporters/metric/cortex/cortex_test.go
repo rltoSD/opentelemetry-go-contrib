@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/snappy"
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/require"
@@ -167,7 +169,7 @@ func TestSendRequest(t *testing.T) {
 		name               string
 		expectedStatusCode int
 		expectedError      error
-		isBadRequest       bool
+		isStatusNotFound   bool
 	}{
 		{
 			"Successful Export",
@@ -177,18 +179,42 @@ func TestSendRequest(t *testing.T) {
 		},
 		{
 			"Export Failure",
-			400,
+			404,
 			cortex.ErrSendRequestFailure,
 			true,
 		},
 	}
 
-	// Set up a test server to receive data. The handler function will return status code
-	// 400 Bad Request if the request's isBadRequest header is set to "true". Otherwise, it returns
-	// 200 OK.
+	// Set up a test server to receive data.
 	handler := func(rw http.ResponseWriter, req *http.Request) {
-		if req.Header.Get("isBadRequest") == "true" {
+		// Check the request body and make sure it was formatted correctly and has the correct
+		// headers.
+		compressed, err := ioutil.ReadAll(req.Body)
+		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		uncompressed, err := snappy.Decode(nil, compressed)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		wr := &prompb.WriteRequest{}
+		err = proto.Unmarshal(uncompressed, wr)
+		if err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if req.Header.Get("X-Prometheus-Remote-Write-Version") != "0.1.0" ||
+			req.Header.Get("Content-Encoding") != "snappy" ||
+			req.Header.Get("Content-Type") != "application/x-protobuf" {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// Return a status code 400 if header isStatusNotFound is "true", 200 otherwise.
+		if req.Header.Get("isStatusNotFound") == "true" {
+			rw.WriteHeader(http.StatusNotFound)
 		} else {
 			rw.WriteHeader(http.StatusOK)
 		}
@@ -203,7 +229,7 @@ func TestSendRequest(t *testing.T) {
 			customConfig := ValidConfig
 			customConfig.Endpoint = server.URL
 			customConfig.Headers = map[string]string{
-				"isBadRequest": strconv.FormatBool(test.isBadRequest),
+				"isStatusNotFound": strconv.FormatBool(test.isStatusNotFound),
 			}
 			exporter := cortex.Exporter{customConfig}
 
