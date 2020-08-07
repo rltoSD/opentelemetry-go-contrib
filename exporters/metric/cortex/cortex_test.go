@@ -1,6 +1,7 @@
 package cortex
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -177,7 +178,7 @@ func TestSendRequest(t *testing.T) {
 		{
 			"Export Failure",
 			404,
-			ErrSendRequestFailure,
+			fmt.Errorf("Failed to send the HTTP request with status code %v", 404),
 			true,
 		},
 	}
@@ -239,8 +240,23 @@ func TestSendRequest(t *testing.T) {
 			require.Nil(t, err)
 
 			// Send the request to the test server and verify errors and status codes.
-			statusCode, err := exporter.sendRequest(req)
-			require.Equal(t, err, test.expectedError)
+			err = exporter.sendRequest(req)
+			var statusCode int
+			var errString string
+			if err != nil {
+				errString = err.Error()
+
+				// Retrieve status code from error string.
+				split := strings.Split(errString, " ")
+				statusCode, err = strconv.Atoi(split[len(split)-1])
+				require.Nil(t, err)
+
+				// Verify errors.
+				require.Equal(t, errString, test.expectedError.Error())
+			} else {
+				statusCode = 200
+				require.Equal(t, nil, test.expectedError)
+			}
 			require.Equal(t, statusCode, test.expectedStatusCode)
 		})
 	}

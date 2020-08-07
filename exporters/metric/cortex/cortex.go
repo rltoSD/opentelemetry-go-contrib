@@ -117,25 +117,22 @@ func (e *Exporter) buildMessage(timeseries []*prompb.TimeSeries) ([]byte, error)
 	return compressed, nil
 }
 
-// ErrSendRequestFailure is an error for when the response does not return status code 200.
-var ErrSendRequestFailure = fmt.Errorf("Failed to send the HTTP request")
-
 // SendRequest sends an http request using the Exporter's http Client. It will not handle retry
 // logic as retrying can more harmful than helpful
-func (e *Exporter) sendRequest(req *http.Request) (int, error) {
+func (e *Exporter) sendRequest(req *http.Request) error {
 	// Attempt to send request.
 	res, err := e.config.Client.Do(req)
 	if err != nil {
-		return -1, err
+		return err
 	}
 	defer res.Body.Close()
 
 	// The response should have a status code of 200.
 	// See https://github.com/prometheus/prometheus/blob/master/storage/remote/client.go#L272.
-	if res.StatusCode != 200 {
-		return res.StatusCode, ErrSendRequestFailure
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed to send the HTTP request with status code %v", res.StatusCode)
 	}
 
 	// Request was successfully sent if the request status code is 200.
-	return 200, nil
+	return nil
 }
