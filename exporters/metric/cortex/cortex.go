@@ -73,6 +73,7 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 func (e *Exporter) AddHeaders(req *http.Request) {
 	// Cortex expects Snappy-compressed protobuf messages. These two headers are hard-coded as they
 	// should be on every request.
+	req.Header.Add("X-Prometheus-Remote-Write-Version", "0.1.0")
 	req.Header.Add("Content-Encoding", "snappy")
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
