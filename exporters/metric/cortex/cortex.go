@@ -19,7 +19,7 @@ import (
 
 // Exporter forwards metrics to a Cortex
 type Exporter struct {
-	Config Config
+	config Config
 }
 
 // ExportKindFor returns CumulativeExporter so the Processor correctly aggregates data
@@ -70,7 +70,7 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 }
 
 // AddHeaders adds required headers as well as all headers in Header map to a http request.
-func (e *Exporter) AddHeaders(req *http.Request) {
+func (e *Exporter) addHeaders(req *http.Request) {
 	// Cortex expects Snappy-compressed protobuf messages. These two headers are hard-coded as they
 	// should be on every request.
 	req.Header.Add("X-Prometheus-Remote-Write-Version", "0.1.0")
@@ -78,28 +78,28 @@ func (e *Exporter) AddHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
 	// Add all user-supplied headers to the request.
-	for name, field := range e.Config.Headers {
+	for name, field := range e.config.Headers {
 		req.Header.Add(name, field)
 	}
 }
 
 // BuildRequest creates an http POST request with a []byte as the body and headers attached.
-func (e *Exporter) BuildRequest(message []byte) (*http.Request, error) {
+func (e *Exporter) buildRequest(message []byte) (*http.Request, error) {
 	// Create the request with the endpoint and message. The message should be a Snappy-compressed
 	// protobuf message.
-	req, err := http.NewRequest(http.MethodPost, e.Config.Endpoint, bytes.NewBuffer(message))
+	req, err := http.NewRequest(http.MethodPost, e.config.Endpoint, bytes.NewBuffer(message))
 	if err != nil {
 		return nil, err
 	}
 
 	// Add the required headers and the headers from Config.Headers.
-	e.AddHeaders(req)
+	e.addHeaders(req)
 
 	return req, nil
 }
 
 // BuildMessage creates a Snappy-compressed protobuf message from a slice of TimeSeries.
-func (e *Exporter) BuildMessage(timeseries []*prompb.TimeSeries) ([]byte, error) {
+func (e *Exporter) buildMessage(timeseries []*prompb.TimeSeries) ([]byte, error) {
 	// Wrap the TimeSeries as a WriteRequest since Cortex requires it.
 	writeRequest := &prompb.WriteRequest{
 		Timeseries: timeseries,
@@ -122,9 +122,9 @@ var ErrSendRequestFailure = fmt.Errorf("Failed to send the HTTP request")
 
 // SendRequest sends an http request using the Exporter's http Client. It will not handle retry
 // logic as retrying can more harmful than helpful
-func (e *Exporter) SendRequest(req *http.Request) (int, error) {
+func (e *Exporter) sendRequest(req *http.Request) (int, error) {
 	// Attempt to send request.
-	res, err := e.Config.Client.Do(req)
+	res, err := e.config.Client.Do(req)
 	if err != nil {
 		return -1, err
 	}

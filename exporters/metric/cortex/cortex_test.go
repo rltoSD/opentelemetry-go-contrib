@@ -1,4 +1,4 @@
-package cortex_test
+package cortex
 
 import (
 	"io/ioutil"
@@ -16,11 +16,37 @@ import (
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
-	"opentelemetry.io/contrib/exporters/metric/cortex"
 )
 
+// ValidConfig is a Config struct that should cause no errors.
+var validConfig = Config{
+	Endpoint:      "/api/prom/push",
+	RemoteTimeout: "30s",
+	Name:          "Valid Config Example",
+	BasicAuth: map[string]string{
+		"username": "user",
+		"password": "password",
+	},
+	BearerToken:     "qwerty12345",
+	BearerTokenFile: "",
+	TLSConfig: map[string]string{
+		"ca_file":              "cafile",
+		"cert_file":            "certfile",
+		"key_file":             "keyfile",
+		"server_name":          "server",
+		"insecure_skip_verify": "1",
+	},
+	ProxyURL:     "",
+	PushInterval: "5s",
+	Headers: map[string]string{
+		"x-prometheus-remote-write-version": "0.1.0",
+		"tenant-id":                         "123",
+	},
+	Client: http.DefaultClient,
+}
+
 func TestExportKindFor(t *testing.T) {
-	exporter := cortex.Exporter{}
+	exporter := Exporter{}
 	got := exporter.ExportKindFor(nil, aggregation.Kind(0))
 	want := metric.CumulativeExporter
 
@@ -32,13 +58,13 @@ func TestExportKindFor(t *testing.T) {
 // TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with the same
 // Config struct as the one passed in.
 func TestNewRawExporter(t *testing.T) {
-	exporter, err := cortex.NewRawExporter(ValidConfig)
+	exporter, err := NewRawExporter(validConfig)
 	if err != nil {
 		t.Fatalf("Failed to create exporter with error %v", err)
 	}
 
-	if !cmp.Equal(ValidConfig, exporter.Config) {
-		t.Fatalf("Got configuration %v, wanted %v", exporter.Config, ValidConfig)
+	if !cmp.Equal(validConfig, exporter.config) {
+		t.Fatalf("Got configuration %v, wanted %v", exporter.config, validConfig)
 	}
 }
 
@@ -46,7 +72,7 @@ func TestNewRawExporter(t *testing.T) {
 // from New RawExporter. Errors in this function will be from calls to push controller package and
 // NewRawExport. Both have their own tests.
 func TestNewExportPipeline(t *testing.T) {
-	_, err := cortex.NewExportPipeline(ValidConfig)
+	_, err := NewExportPipeline(validConfig)
 	if err != nil {
 		t.Fatalf("Failed to create export pipeline with error %v", err)
 	}
@@ -55,7 +81,7 @@ func TestNewExportPipeline(t *testing.T) {
 // TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push Controller
 // and whether that controller's Provider is registered globally.
 func TestInstallNewPipeline(t *testing.T) {
-	pusher, err := cortex.InstallNewPipeline(ValidConfig)
+	pusher, err := InstallNewPipeline(validConfig)
 	if err != nil {
 		t.Fatalf("Failed to create install pipeline with error %v", err)
 	}
@@ -68,20 +94,20 @@ func TestInstallNewPipeline(t *testing.T) {
 // Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
 func TestAddHeaders(t *testing.T) {
 	// Make a fake Config struct and Exporter for testing.
-	testConfig := cortex.Config{
+	testConfig := Config{
 		Headers: map[string]string{
 			"testHeader":    "testField",
 			"TestHeaderTwo": "testFieldTwo",
 		},
 	}
-	exporter := cortex.Exporter{testConfig}
+	exporter := Exporter{testConfig}
 
 	// Create http request to add headers to.
 	req, err := http.NewRequest("POST", "test.com", nil)
 	if err != nil {
 		t.Errorf("Failed to create http request with error %v", err)
 	}
-	exporter.AddHeaders(req)
+	exporter.addHeaders(req)
 
 	// Check that all the headers are there.
 	for name, field := range testConfig.Headers {
@@ -105,10 +131,10 @@ func TestAddHeaders(t *testing.T) {
 func TestBuildRequest(t *testing.T) {
 	// Make fake exporter and message for testing.
 	var testMessage = []byte(`Test Message!`)
-	exporter := cortex.Exporter{ValidConfig}
+	exporter := Exporter{validConfig}
 
 	// Create the http request.
-	req, err := exporter.BuildRequest(testMessage)
+	req, err := exporter.buildRequest(testMessage)
 	if err != nil {
 		t.Fatalf("Failed to build request with error %v", err)
 	}
@@ -117,8 +143,8 @@ func TestBuildRequest(t *testing.T) {
 	if req.Method != http.MethodPost {
 		t.Errorf("Request is of method %v, wanted POST", req.Method)
 	}
-	if req.URL.String() != ValidConfig.Endpoint {
-		t.Errorf("Request has endpoint %v, wanted %v", req.URL, ValidConfig.Endpoint)
+	if req.URL.String() != validConfig.Endpoint {
+		t.Errorf("Request has endpoint %v, wanted %v", req.URL, validConfig.Endpoint)
 	}
 	reqMessage, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -129,7 +155,7 @@ func TestBuildRequest(t *testing.T) {
 	}
 
 	// Verify headers.
-	for name, field := range exporter.Config.Headers {
+	for name, field := range exporter.config.Headers {
 		// Headers are case-insensitive; Viper converts all keys to lower-case.
 		lowercaseName := strings.ToLower(name)
 		if req.Header.Get(lowercaseName) != field {
@@ -148,13 +174,13 @@ func TestBuildRequest(t *testing.T) {
 // message.
 // Note: Not too sure how to test this function.
 func TestBuildMessage(t *testing.T) {
-	exporter := cortex.Exporter{ValidConfig}
+	exporter := Exporter{validConfig}
 	timeseries := []*prompb.TimeSeries{}
 
 	// BuildMessage simply calls protobuf.Marshal() and snappy.Encode(). BuildMessage returns the
 	// error returned by these two functions, which have their own tests in their respective
 	// packages. As long as no error is returned, the function should work as expected.
-	_, err := exporter.BuildMessage(timeseries)
+	_, err := exporter.buildMessage(timeseries)
 	if err != nil {
 		t.Errorf("Failed to build Snappy-compressed protobuf message with error %v", err)
 	}
@@ -179,7 +205,7 @@ func TestSendRequest(t *testing.T) {
 		{
 			"Export Failure",
 			404,
-			cortex.ErrSendRequestFailure,
+			ErrSendRequestFailure,
 			true,
 		},
 	}
@@ -225,23 +251,23 @@ func TestSendRequest(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Set up an Exporter that uses the test server's endpoint and attaches the test's
 			// serverFailure header.
-			customConfig := ValidConfig
+			customConfig := validConfig
 			customConfig.Endpoint = server.URL
 			customConfig.Headers = map[string]string{
 				"isStatusNotFound": strconv.FormatBool(test.isStatusNotFound),
 			}
-			exporter := cortex.Exporter{customConfig}
+			exporter := Exporter{customConfig}
 
 			// Create an empty Snappy-compressed message.
-			msg, err := exporter.BuildMessage([]*prompb.TimeSeries{})
+			msg, err := exporter.buildMessage([]*prompb.TimeSeries{})
 			require.Nil(t, err)
 
 			// Create a http POST request with the compressed message.
-			req, err := exporter.BuildRequest(msg)
+			req, err := exporter.buildRequest(msg)
 			require.Nil(t, err)
 
 			// Send the request to the test server and verify errors and status codes.
-			statusCode, err := exporter.SendRequest(req)
+			statusCode, err := exporter.sendRequest(req)
 			require.Equal(t, err, test.expectedError)
 			require.Equal(t, statusCode, test.expectedStatusCode)
 		})
