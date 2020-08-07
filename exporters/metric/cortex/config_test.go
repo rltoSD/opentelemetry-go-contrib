@@ -21,6 +21,30 @@ var ExampleStandardConfig = cortex.Config{
 	Client:        http.DefaultClient,
 }
 
+// This is an example Config struct with default values, but without a remote timeout.
+var ExampleNoRemoteTimeoutConfig = cortex.Config{
+	Endpoint:     "/api/prom/push",
+	Name:         "Standard Config",
+	PushInterval: 10 * time.Second,
+	Client:       http.DefaultClient,
+}
+
+// This is an example Config struct with default values, but without a push interval.
+var ExampleNoPushIntervalConfig = cortex.Config{
+	Endpoint:     "/api/prom/push",
+	Name:         "Standard Config",
+	PushInterval: 10 * time.Second,
+	Client:       http.DefaultClient,
+}
+
+// This is an example Config struct with default values, but without a http client.
+var ExampleNoClientConfig = cortex.Config{
+	Endpoint:      "/api/prom/push",
+	Name:          "Standard Config",
+	RemoteTimeout: 30 * time.Second,
+	PushInterval:  10 * time.Second,
+}
+
 var ExampleNoEndpointConfig = cortex.Config{
 	Name:          "Standard Config",
 	RemoteTimeout: 30 * time.Second,
@@ -28,8 +52,7 @@ var ExampleNoEndpointConfig = cortex.Config{
 	Client:        http.DefaultClient,
 }
 
-// This is an example Config struct with mostly default values. The endpoint is not default since
-// there is no default endpoint.
+// This is an example Config struct with two bearer tokens.
 var ExampleTwoBearerTokenConfig = cortex.Config{
 	Endpoint:        "/api/prom/push",
 	Name:            "Standard Config",
@@ -40,6 +63,7 @@ var ExampleTwoBearerTokenConfig = cortex.Config{
 	Client:          http.DefaultClient,
 }
 
+// This is an example Config struct with two passwords.
 var ExampleTwoPasswordConfig = cortex.Config{
 	Endpoint:      "/api/prom/push",
 	Name:          "Standard Config",
@@ -80,36 +104,61 @@ var ExampleConfigWithProxy = cortex.Config{
 	},
 }
 
-// TestValidate checks whether Validate() returns the correct error on different Config structs.
+// TestValidate checks whether Validate() returns the correct error and sets the correct default
+// values.
 func TestValidate(t *testing.T) {
 	tests := []struct {
-		testName      string
-		config        cortex.Config
-		expectedError error
+		testName       string
+		config         *cortex.Config
+		expectedConfig *cortex.Config
+		expectedError  error
 	}{
 		{
 			"Standard Config",
-			ExampleStandardConfig,
+			&ExampleStandardConfig,
+			&ExampleStandardConfig,
 			nil,
 		},
 		{
 			"Config with Conflicting Bearer Tokens",
-			ExampleTwoBearerTokenConfig,
+			&ExampleTwoBearerTokenConfig,
+			nil,
 			cortex.ErrTwoBearerTokens,
 		},
 		{
 			"Config with Conflicting Passwords",
-			ExampleTwoPasswordConfig,
+			&ExampleTwoPasswordConfig,
+			nil,
 			cortex.ErrTwoPasswords,
 		},
 		{
 			"Config with Proxy URL",
-			ExampleConfigWithProxy,
+			&ExampleConfigWithProxy,
+			&ExampleConfigWithProxy,
 			nil,
 		},
 		{
 			"Config with no Endpoint",
-			ExampleNoEndpointConfig,
+			&ExampleNoEndpointConfig,
+			&ExampleStandardConfig,
+			nil,
+		},
+		{
+			"Config with no Remote Timeout",
+			&ExampleNoRemoteTimeoutConfig,
+			&ExampleStandardConfig,
+			nil,
+		},
+		{
+			"Config with no Push Interval",
+			&ExampleNoPushIntervalConfig,
+			&ExampleStandardConfig,
+			nil,
+		},
+		{
+			"Config with no Client",
+			&ExampleNoClientConfig,
+			&ExampleStandardConfig,
 			nil,
 		},
 	}
@@ -117,6 +166,9 @@ func TestValidate(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			err := test.config.Validate()
 			require.Equal(t, err, test.expectedError)
+			if err == nil {
+				require.Equal(t, test.config, test.expectedConfig)
+			}
 		})
 	}
 }
