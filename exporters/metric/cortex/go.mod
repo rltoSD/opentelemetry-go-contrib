@@ -9,6 +9,7 @@ require (
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/afero v1.3.3
 	github.com/spf13/viper v1.7.1
+	github.com/stretchr/testify v1.6.1
 	go.opentelemetry.io/otel v0.10.0
 	go.opentelemetry.io/otel/sdk v0.10.0
 )

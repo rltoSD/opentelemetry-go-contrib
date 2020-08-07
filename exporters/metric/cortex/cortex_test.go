@@ -1,16 +1,16 @@
 package cortex_test
 
 import (
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/prometheus/prometheus/prompb"
-
 	"github.com/google/go-cmp/cmp"
+	"github.com/prometheus/prometheus/prompb"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
@@ -167,37 +167,28 @@ func TestSendRequest(t *testing.T) {
 		name               string
 		expectedStatusCode int
 		expectedError      error
-		numFailures        int
+		isBadRequest       bool
 	}{
 		{
 			"Successful Export",
 			200,
 			nil,
-			0,
+			false,
 		},
 		{
-			"Fails Export once",
-			200,
-			nil,
-			1,
-		},
-		{
-			"Fail Export twice",
-			404,
-			cortex.ErrRetryLimitReached,
-			2,
+			"Export Failure",
+			400,
+			cortex.ErrSendRequestFailure,
+			true,
 		},
 	}
 
-	// This value will be set in the testing loop and is used by the handler function.
-	failureCount := 0
-
 	// Set up a test server to receive data. The handler function will return status code
-	// 404 and decrement this value until it reaches 0, when it returns status code 200.
+	// 400 Bad Request if the request's isBadRequest header is set to "true". Otherwise, it returns
+	// 200 OK.
 	handler := func(rw http.ResponseWriter, req *http.Request) {
-		if failureCount > 0 {
-			failureCount--
-			rw.WriteHeader(http.StatusNotFound)
+		if req.Header.Get("isBadRequest") == "true" {
+			rw.WriteHeader(http.StatusBadRequest)
 		} else {
 			rw.WriteHeader(http.StatusOK)
 		}
@@ -207,34 +198,27 @@ func TestSendRequest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Set number of times the server will return 404 on.
-			failureCount = test.numFailures
-
-			// Set up an Exporter that uses the test server's endpoint.
+			// Set up an Exporter that uses the test server's endpoint and attaches the test's
+			// serverFailure header.
 			customConfig := ValidConfig
 			customConfig.Endpoint = server.URL
+			customConfig.Headers = map[string]string{
+				"isBadRequest": strconv.FormatBool(test.isBadRequest),
+			}
 			exporter := cortex.Exporter{customConfig}
 
 			// Create an empty Snappy-compressed message.
 			msg, err := exporter.BuildMessage([]*prompb.TimeSeries{})
-			if err != nil {
-				t.Fatalf("Failed to build Snappy-compressed protobuf message with error %v", err)
-			}
+			require.Nil(t, err)
 
 			// Create a http POST request with the compressed message.
 			req, err := exporter.BuildRequest(msg)
-			if err != nil {
-				t.Fatalf("Failed to build request with error %v", err)
-			}
+			require.Nil(t, err)
 
 			// Send the request to the test server and verify errors and status codes.
-			statusCode, err := exporter.SendRequest(req, 0)
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("Wanted error %v, received error %v", test.expectedError, err)
-			}
-			if statusCode != test.expectedStatusCode {
-				t.Errorf("Wanted status code %v, received status code %v instead", test.expectedStatusCode, statusCode)
-			}
+			statusCode, err := exporter.SendRequest(req)
+			require.Equal(t, err, test.expectedError)
+			require.Equal(t, statusCode, test.expectedStatusCode)
 		})
 	}
 }

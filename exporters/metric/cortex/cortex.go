@@ -86,7 +86,7 @@ func (e *Exporter) AddHeaders(req *http.Request) {
 func (e *Exporter) BuildRequest(message []byte) (*http.Request, error) {
 	// Create the request with the endpoint and message. The message should be a Snappy-compressed
 	// protobuf message.
-	req, err := http.NewRequest("POST", e.Config.Endpoint, bytes.NewBuffer(message))
+	req, err := http.NewRequest(http.MethodPost, e.Config.Endpoint, bytes.NewBuffer(message))
 	if err != nil {
 		return nil, err
 	}
@@ -116,30 +116,25 @@ func (e *Exporter) BuildMessage(timeseries []*prompb.TimeSeries) ([]byte, error)
 	return compressed, nil
 }
 
-// Default number of times to retry sending a request upon failure.
-var maxRetryCount = 1
+// ErrSendRequestFailure is an error for when the response does not return status code 200.
+var ErrSendRequestFailure = fmt.Errorf("Failed to send the HTTP request")
 
-// ErrRetryLimitReached is an error for when the Exporter fails to send the request after more than
-// `maxRetryCount` times.
-var ErrRetryLimitReached = fmt.Errorf("Failed to send request after reaching retry limit")
-
-// SendRequest sends an http request using the Exporter's http Client. It will retry once
-func (e *Exporter) SendRequest(req *http.Request, retryCount int) (int, error) {
+// SendRequest sends an http request using the Exporter's http Client. It will not handle retry
+// logic as retrying can more harmful than helpful
+func (e *Exporter) SendRequest(req *http.Request) (int, error) {
 	// Attempt to send request.
 	res, err := e.Config.Client.Do(req)
 	if err != nil {
 		return -1, err
 	}
+	defer res.Body.Close()
 
-	// Request was successfully sent if the request status code is 2xx.
-	if res.StatusCode >= 200 && res.StatusCode <= 299 {
-		return res.StatusCode, nil
+	// The response should have a status code of 200.
+	// See https://github.com/prometheus/prometheus/blob/master/storage/remote/client.go#L272.
+	if res.StatusCode != 200 {
+		return res.StatusCode, ErrSendRequestFailure
 	}
 
-	// Retry up to `maxRetryCount`. Otherwise, return an error.
-	retryCount++
-	if retryCount > maxRetryCount {
-		return res.StatusCode, ErrRetryLimitReached
-	}
-	return e.SendRequest(req, retryCount)
+	// Request was successfully sent if the request status code is 200.
+	return 200, nil
 }
