@@ -160,10 +160,9 @@ func TestBuildMessage(t *testing.T) {
 	}
 }
 
-// TestSendRequest tests if the Exporter can successfully send a http request as well as the retry
-// functionality by creating a test server and sending requests to it using SendRequest(). The test
-// server will imitate a failure by returning status code 404 a test-specified amount of times.
-// Note: this could be moved to a `cortex_internal_test.go` file as it doesn't need to be exported.
+// TestSendRequest tests if the Exporter can successfully send a http request with a correctly
+// formatted request and the correct headers. A test server returns status codes to test if the
+// Exporter responds to send failure correctly.
 func TestSendRequest(t *testing.T) {
 	tests := []struct {
 		name               string
