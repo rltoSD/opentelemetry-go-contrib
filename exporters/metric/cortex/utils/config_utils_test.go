@@ -130,7 +130,9 @@ var validConfig = cortex.Config{
 	Headers: map[string]string{
 		"test": "header",
 	},
-	Client: http.DefaultClient,
+	Client: &http.Client{
+		Timeout: 30 * time.Second,
+	},
 }
 
 // initYAML creates a YAML file at a given filepath in a in-memory file system.
@@ -164,44 +166,44 @@ func TestNewConfig(t *testing.T) {
 		expectedError  error
 	}{
 		{
-			"Valid Config file",
-			validYAML,
-			"config.yml",
-			"/test",
-			&validConfig,
-			nil,
+			testName:       "Valid Config file",
+			yamlByteString: validYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/test",
+			expectedConfig: &validConfig,
+			expectedError:  nil,
 		},
 		{
-			"No Timeout",
-			noTimeoutYAML,
-			"config.yml",
-			"/test",
-			&validConfig,
-			nil,
+			testName:       "No Timeout",
+			yamlByteString: noTimeoutYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/test",
+			expectedConfig: &validConfig,
+			expectedError:  nil,
 		},
 		{
-			"No Endpoint URL",
-			noEndpointYAML,
-			"config.yml",
-			"/test",
-			&validConfig,
-			nil,
+			testName:       "No Endpoint URL",
+			yamlByteString: noEndpointYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/test",
+			expectedConfig: &validConfig,
+			expectedError:  nil,
 		},
 		{
-			"Two passwords",
-			twoPasswordsYAML,
-			"config.yml",
-			"/test",
-			nil,
-			cortex.ErrTwoPasswords,
+			testName:       "Two passwords",
+			yamlByteString: twoPasswordsYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/test",
+			expectedConfig: nil,
+			expectedError:  cortex.ErrTwoPasswords,
 		},
 		{
-			"Two Bearer Tokens",
-			twoBearerTokensYAML,
-			"config.yml",
-			"/test",
-			nil,
-			cortex.ErrTwoBearerTokens,
+			testName:       "Two Bearer Tokens",
+			yamlByteString: twoBearerTokensYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/test",
+			expectedConfig: nil,
+			expectedError:  cortex.ErrTwoBearerTokens,
 		},
 	}
 
@@ -237,18 +239,18 @@ func TestWithFilepath(t *testing.T) {
 		addPath        bool
 	}{
 		{
-			"Filepath provided, successful construction of Config",
-			validYAML,
-			"config.yml",
-			"/success",
-			true,
+			testName:       "Filepath provided, successful construction of Config",
+			yamlByteString: validYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/success",
+			addPath:        true,
 		},
 		{
-			"Filepath not provided, unsuccessful construction of Config",
-			validYAML,
-			"config.yml",
-			"/fail",
-			false,
+			testName:       "Filepath not provided, unsuccessful construction of Config",
+			yamlByteString: validYAML,
+			fileName:       "config.yml",
+			directoryPath:  "/fail",
+			addPath:        false,
 		},
 	}
 
