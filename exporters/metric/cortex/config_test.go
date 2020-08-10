@@ -1,43 +1,63 @@
 package cortex_test
 
 import (
-	"net"
 	"net/http"
-	"net/url"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"opentelemetry.io/contrib/exporters/metric/cortex"
+	"go.opentelemetry.io/contrib/exporters/metric/cortex"
 )
 
-// This is an example Config struct with mostly default values. The endpoint is not default since
-// there is no default endpoint.
-var ExampleStandardConfig = cortex.Config{
+// Default http client with a timeout of 30 seconds.
+var defaultClientWithTimeout = &http.Client{
+	Timeout: 30 * time.Second,
+}
+
+// Config struct with default values. This is used to verify the output of Validate().
+var ValidatedStandardConfig = cortex.Config{
 	Endpoint:      "/api/prom/push",
 	Name:          "Standard Config",
 	RemoteTimeout: 30 * time.Second,
 	PushInterval:  10 * time.Second,
-	Client:        http.DefaultClient,
+	Client:        defaultClientWithTimeout,
 }
 
-// This is an example Config struct with default values, but without a remote timeout.
+// Config struct with default values other than the remote timeout. This is used to verify the
+// output of Validate().
+var ValidatedCustomTimeoutConfig = cortex.Config{
+	Endpoint:      "/api/prom/push",
+	Name:          "Standard Config",
+	RemoteTimeout: 10 * time.Second,
+	PushInterval:  10 * time.Second,
+	Client: &http.Client{
+		Timeout: 10 * time.Second,
+	},
+}
+
+// Example Config struct with a custom remote timeout.
+var ExampleRemoteTimeoutConfig = cortex.Config{
+	Endpoint:      "/api/prom/push",
+	Name:          "Standard Config",
+	PushInterval:  10 * time.Second,
+	RemoteTimeout: 10 * time.Second,
+}
+
+// Example Config struct without a remote timeout.
 var ExampleNoRemoteTimeoutConfig = cortex.Config{
 	Endpoint:     "/api/prom/push",
 	Name:         "Standard Config",
 	PushInterval: 10 * time.Second,
-	Client:       http.DefaultClient,
 }
 
-// This is an example Config struct with default values, but without a push interval.
+// Example Config struct without a push interval.
 var ExampleNoPushIntervalConfig = cortex.Config{
-	Endpoint:     "/api/prom/push",
-	Name:         "Standard Config",
-	PushInterval: 10 * time.Second,
-	Client:       http.DefaultClient,
+	Endpoint:      "/api/prom/push",
+	Name:          "Standard Config",
+	RemoteTimeout: 30 * time.Second,
 }
 
-// This is an example Config struct with default values, but without a http client.
+// Example Config struct without a http client.
 var ExampleNoClientConfig = cortex.Config{
 	Endpoint:      "/api/prom/push",
 	Name:          "Standard Config",
@@ -45,11 +65,11 @@ var ExampleNoClientConfig = cortex.Config{
 	PushInterval:  10 * time.Second,
 }
 
+// Example Config struct without an endpoint.
 var ExampleNoEndpointConfig = cortex.Config{
 	Name:          "Standard Config",
 	RemoteTimeout: 30 * time.Second,
 	PushInterval:  10 * time.Second,
-	Client:        http.DefaultClient,
 }
 
 // This is an example Config struct with two bearer tokens.
@@ -60,7 +80,6 @@ var ExampleTwoBearerTokenConfig = cortex.Config{
 	PushInterval:    10 * time.Second,
 	BearerToken:     "bearer_token",
 	BearerTokenFile: "bearer_token_file",
-	Client:          http.DefaultClient,
 }
 
 // This is an example Config struct with two passwords.
@@ -74,34 +93,6 @@ var ExampleTwoPasswordConfig = cortex.Config{
 		"password":      "password",
 		"password_file": "passwordFile",
 	},
-	Client: http.DefaultClient,
-}
-
-// This is an example Config struct with a proxy url. url.Parse returns an error, so the variable it
-// is called outside of the struct.
-var proxyURL = "/proxy/url"
-var parsedProxyURL, err = url.Parse(proxyURL)
-var ExampleConfigWithProxy = cortex.Config{
-	Endpoint:      "/api/prom/push",
-	RemoteTimeout: 30 * time.Second,
-	Name:          "Config with proxy",
-	ProxyURL:      "/proxy/url",
-	PushInterval:  10 * time.Second,
-	Client: &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(parsedProxyURL),
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-				DualStack: true,
-			}).DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-	},
 }
 
 // TestValidate checks whether Validate() returns the correct error and sets the correct default
@@ -113,12 +104,6 @@ func TestValidate(t *testing.T) {
 		expectedConfig *cortex.Config
 		expectedError  error
 	}{
-		{
-			"Standard Config",
-			&ExampleStandardConfig,
-			&ExampleStandardConfig,
-			nil,
-		},
 		{
 			"Config with Conflicting Bearer Tokens",
 			&ExampleTwoBearerTokenConfig,
@@ -132,33 +117,33 @@ func TestValidate(t *testing.T) {
 			cortex.ErrTwoPasswords,
 		},
 		{
-			"Config with Proxy URL",
-			&ExampleConfigWithProxy,
-			&ExampleConfigWithProxy,
+			"Config with Custom Timeout",
+			&ExampleRemoteTimeoutConfig,
+			&ValidatedCustomTimeoutConfig,
 			nil,
 		},
 		{
 			"Config with no Endpoint",
 			&ExampleNoEndpointConfig,
-			&ExampleStandardConfig,
+			&ValidatedStandardConfig,
 			nil,
 		},
 		{
 			"Config with no Remote Timeout",
 			&ExampleNoRemoteTimeoutConfig,
-			&ExampleStandardConfig,
+			&ValidatedStandardConfig,
 			nil,
 		},
 		{
 			"Config with no Push Interval",
 			&ExampleNoPushIntervalConfig,
-			&ExampleStandardConfig,
+			&ValidatedStandardConfig,
 			nil,
 		},
 		{
 			"Config with no Client",
 			&ExampleNoClientConfig,
-			&ExampleStandardConfig,
+			&ValidatedStandardConfig,
 			nil,
 		},
 	}

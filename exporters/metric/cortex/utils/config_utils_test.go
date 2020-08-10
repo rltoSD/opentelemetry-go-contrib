@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
-	"opentelemetry.io/contrib/exporters/metric/cortex"
-	"opentelemetry.io/contrib/exporters/metric/cortex/utils"
+	"go.opentelemetry.io/contrib/exporters/metric/cortex"
+	"go.opentelemetry.io/contrib/exporters/metric/cortex/utils"
 )
 
 // This is an example YAML file that produces a Config struct without errors.

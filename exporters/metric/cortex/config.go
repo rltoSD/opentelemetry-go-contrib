@@ -61,25 +61,30 @@ func (c *Config) Validate() error {
 		if err != nil {
 			return err
 		}
-		transport := &http.Transport{
-			Proxy: http.ProxyURL(parsedProxyURL),
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-				DualStack: true,
-			}).DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		}
 
-		// Client is the same as http.DefaultClient other than the proxy.
-		c.Client = &http.Client{Transport: transport}
+		// Client is the same as http.DefaultClient other than the proxy and the timeout.
+		c.Client = &http.Client{
+			Timeout: c.RemoteTimeout,
+			Transport: &http.Transport{
+				Proxy: http.ProxyURL(parsedProxyURL),
+				DialContext: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+					DualStack: true,
+				}).DialContext,
+				ForceAttemptHTTP2:     true,
+				MaxIdleConns:          100,
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		}
 	}
 	if c.Client == nil {
-		c.Client = http.DefaultClient
+		c.Client = &http.Client{
+			Timeout: c.RemoteTimeout,
+		}
 	}
+
 	return nil
 }

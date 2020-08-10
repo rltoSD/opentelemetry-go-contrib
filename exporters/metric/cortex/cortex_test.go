@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"go.opentelemetry.io/contrib/exporters/metric/cortex"
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
-	"opentelemetry.io/contrib/exporters/metric/cortex"
 )
 
 func TestExportKindFor(t *testing.T) {
@@ -23,13 +23,13 @@ func TestExportKindFor(t *testing.T) {
 // TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with the same
 // Config struct as the one passed in.
 func TestNewRawExporter(t *testing.T) {
-	exporter, err := cortex.NewRawExporter(ExampleStandardConfig)
+	exporter, err := cortex.NewRawExporter(ValidatedStandardConfig)
 	if err != nil {
 		t.Fatalf("Failed to create exporter with error %v", err)
 	}
 
-	if !cmp.Equal(ExampleStandardConfig, exporter.Config) {
-		t.Fatalf("Got configuration %v, wanted %v", exporter.Config, ExampleStandardConfig)
+	if !cmp.Equal(ValidatedStandardConfig, exporter.Config) {
+		t.Fatalf("Got configuration %v, wanted %v", exporter.Config, ValidatedStandardConfig)
 	}
 }
 
@@ -37,7 +37,7 @@ func TestNewRawExporter(t *testing.T) {
 // from New RawExporter. Errors in this function will be from calls to push controller package and
 // NewRawExport. Both have their own tests.
 func TestNewExportPipeline(t *testing.T) {
-	_, err := cortex.NewExportPipeline(ExampleStandardConfig)
+	_, err := cortex.NewExportPipeline(ValidatedStandardConfig)
 	if err != nil {
 		t.Fatalf("Failed to create export pipeline with error %v", err)
 	}
@@ -46,7 +46,7 @@ func TestNewExportPipeline(t *testing.T) {
 // TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push Controller
 // and whether that controller's Provider is registered globally.
 func TestInstallNewPipeline(t *testing.T) {
-	pusher, err := cortex.InstallNewPipeline(ExampleStandardConfig)
+	pusher, err := cortex.InstallNewPipeline(ValidatedStandardConfig)
 	if err != nil {
 		t.Fatalf("Failed to create install pipeline with error %v", err)
 	}
