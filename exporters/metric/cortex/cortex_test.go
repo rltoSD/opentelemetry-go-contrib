@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/snappy"
@@ -22,7 +23,7 @@ import (
 // ValidConfig is a Config struct that should cause no errors.
 var validConfig = Config{
 	Endpoint:      "/api/prom/push",
-	RemoteTimeout: "30s",
+	RemoteTimeout: 30 * time.Second,
 	Name:          "Valid Config Example",
 	BasicAuth: map[string]string{
 		"username": "user",
@@ -38,7 +39,7 @@ var validConfig = Config{
 		"insecure_skip_verify": "1",
 	},
 	ProxyURL:     "",
-	PushInterval: "5s",
+	PushInterval: 10 * time.Second,
 	Headers: map[string]string{
 		"x-prometheus-remote-write-version": "0.1.0",
 		"tenant-id":                         "123",

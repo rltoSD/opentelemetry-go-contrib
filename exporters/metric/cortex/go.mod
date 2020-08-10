@@ -1,4 +1,4 @@
-module opentelemetry.io/contrib/exporters/metric/cortex
+module go.opentelemetry.io/contrib/exporters/metric/cortex
 
 go 1.14
 
