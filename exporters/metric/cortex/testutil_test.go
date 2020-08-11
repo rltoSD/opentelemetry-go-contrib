@@ -114,3 +114,8 @@ func getMMSCCheckpoint(t *testing.T, values ...float64) export.CheckpointSet {
 
 	return checkpointSet
 }
+
+// getDistributionCheckpoint returns a checkpoint set with a distribution aggregation record
+func getDistributionCheckpoint(t *testing.T, values ...float64) export.CheckpointSet {
+	return nil
+}

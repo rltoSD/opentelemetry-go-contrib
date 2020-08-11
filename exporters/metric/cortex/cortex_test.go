@@ -231,6 +231,28 @@ func TestConvertToTimeSeries(t *testing.T) {
 				},
 			},
 		},
+		// {
+		// 	name:  "convertFromDistribution",
+		// 	input: getDistributionCheckpoint(t, 123),
+		// 	want: []*prompb.TimeSeries{
+		// 		&prompb.TimeSeries{
+		// 			Labels: []*prompb.Label{
+		// 				{
+		// 					Name:  "R",
+		// 					Value: "V",
+		// 				},
+		// 				{
+		// 					Name:  "name",
+		// 					Value: "metric_name",
+		// 				},
+		// 			},
+		// 			Samples: []prompb.Sample{{
+		// 				Value:     123,
+		// 				Timestamp: mockTime,
+		// 			}},
+		// 		},
+		// 	},
+		// },
 	}
 
 	for _, tt := range tests {
