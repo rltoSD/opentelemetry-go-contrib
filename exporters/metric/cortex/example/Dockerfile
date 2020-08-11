@@ -13,8 +13,20 @@
 # limitations under the License.
 
 FROM golang:1.14-alpine
-# TODO: Update with Cortex Exporter path
-COPY . /go/src/github.com/open-telemetry/opentelemetry-go/
-WORKDIR /go/src/github.com/open-telemetry/opentelemetry-go/example/zipkin/
-RUN go install ./main.go
-CMD ["/go/bin/main"]
+
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy the source code from the current directory
+COPY . .
+
+# Build the application
+RUN go build -o main .
+
+# Command to run the executable
+CMD ["./main"]

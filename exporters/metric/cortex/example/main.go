@@ -14,44 +14,61 @@
 
 // This is an example program that creates metrics
 // and exports to Cortex.
+
 package main
 
 import (
 	"context"
 	"fmt"
-	"log"
+	"net/http"
 	"time"
 
-	"go.opentelemetry.io/contrib/exporters/metric/cortex"
-	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/exporters/metric/prometheus"
+	"go.opentelemetry.io/otel/sdk/metric/controller/pull"
+	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-// Creates a Cortex Exporter
-func initMeter() {
-	exporter, err := cortex.InstallNewPipeline(cortex.Config{})
-	if err != nil {
-		log.Panicf("Failed to initialize Cortex exporter %v", err)
-	}
-	fmt.Println("Cortex exporter now running")
-}
-
 func main() {
-	// Create Exporter
-	initMeter()
-
-	// Get global meter, labels, and context
-	meter := global.Meter("ex.com/basic")
-	commonLabels := []kv.KeyValue{lemonsKey.Int(10), kv.String("A", "1"), kv.String("B", "2"), kv.String("C", "3")}
+	// Setup a new Prometheus Exporter
+	exporter, err := prometheus.NewExportPipeline(
+		prometheus.Config{},
+		pull.WithResource(resource.New(kv.String("R", "V"))),
+	)
+	if err != nil {
+		panic(err)
+	}
+	meter := exporter.Provider().Meter("example")
 	ctx := context.Background()
 
-	// Create a counter
-	counter := metric.Must(meter).NewFloat64Counter("float64_counter")
+	// Create two instruments with Go SDK metric package
+	counter := metric.Must(meter).NewInt64Counter(
+		"a.counter",
+		metric.WithDescription("Counts things"),
+	)
+	recorder := metric.Must(meter).NewInt64ValueRecorder(
+		"a.valuerecorder",
+		metric.WithDescription("Records values"),
+	)
 
-	// While the program is running, increment the counter
-	for x := range time.Tick(1 * time.Second) {
-		fmt.Printf("Tick: %v\n", x)
-		counter.add(ctx, 1, commonLabels)
-	}
+	// Add initial values to the instruments
+	counter.Add(ctx, 5, kv.String("key", "value"))
+	recorder.Record(ctx, 100, kv.String("key", "value"))
+
+	// Repeatedly record values every 3 seconds
+	go func() {
+		for i := 1; i <= 5000; i++ {
+			time.Sleep(3 * time.Second)
+			value := int64(i * 100)
+			fmt.Printf("%d. Recording %d in recorder and adding %d to counter\n", i, value, i)
+			recorder.Record(ctx, value, kv.String("key", "value"))
+			counter.Add(ctx, int64(i), kv.String("key", "value"))
+		}
+	}()
+
+	// Set up an endpoint to wait for Prometheus scrapes
+	fmt.Println("Server started!")
+	http.Handle("/", exporter)
+	http.ListenAndServe(":8888", nil)
 }
