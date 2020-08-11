@@ -27,10 +27,14 @@ import (
 	"github.com/golang/snappy"
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/sdk/export/metric"
+	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
+	"go.opentelemetry.io/otel/sdk/resource"
 )
 
 // ValidConfig is a Config struct that should cause no errors.
@@ -72,7 +76,6 @@ func TestExportKindFor(t *testing.T) {
 		t.Errorf("ExportKindFor() =  %q, want %q", got, want)
 	}
 }
-
 
 func TestConvertToTimeSeries(t *testing.T) {
 	// Setup
@@ -171,7 +174,6 @@ func TestConvertToTimeSeries(t *testing.T) {
 		})
 	}
 }
-
 
 // TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with the same
 // Config struct as the one passed in.
