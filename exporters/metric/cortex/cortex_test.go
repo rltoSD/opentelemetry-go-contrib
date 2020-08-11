@@ -81,42 +81,36 @@ func TestConvertToTimeSeries(t *testing.T) {
 	// Setup
 	exporter := Exporter{}
 
-	t.Run("handles valid checkpointSet", func(t *testing.T) {
-
-		// Create valid checkpoint set
-		validCheckpointSet := getValidCheckpointSet(t)
-		// Convert
-		got, err := exporter.ConvertToTimeSeries(validCheckpointSet)
-		want := []*prompb.TimeSeries{
-			&prompb.TimeSeries{
-				Labels: []*prompb.Label{
-					{
-						Name:  "R",
-						Value: "V",
-					},
-					{
-						Name:  "name",
-						Value: "metric_name",
-					},
-				},
-				Samples: []prompb.Sample{{
-					Value:     321,
-					Timestamp: mockTime,
-				}},
-			},
-		}
-
-		assert.Nil(t, err, "ConvertToTimeSeries error")
-		assert.Len(t, got, 1, "Expected one timeseries")
-		cmp.Equal(got, want)
-	})
-
 	// Test conversions based on aggregation type
 	tests := []struct {
-		name  string
-		input export.CheckpointSet
-		want  []*prompb.TimeSeries
+		name       string
+		input      export.CheckpointSet
+		want       []*prompb.TimeSeries
+		wantLength int
 	}{
+		{
+			name:  "validCheckpointSet",
+			input: getValidCheckpointSet(t),
+			want: []*prompb.TimeSeries{
+				&prompb.TimeSeries{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "name",
+							Value: "metric_name",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     321,
+						Timestamp: mockTime,
+					}},
+				},
+			},
+			wantLength: 1,
+		},
 		{
 			name:  "convertFromSum",
 			input: getSumCheckpoint(t, 321),
@@ -138,6 +132,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 					}},
 				},
 			},
+			wantLength: 1,
 		},
 		{
 			name:  "convertFromLastValue",
@@ -160,6 +155,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 					}},
 				},
 			},
+			wantLength: 1,
 		},
 		{
 			name:  "convertFromMinMaxSumCount",
@@ -230,29 +226,8 @@ func TestConvertToTimeSeries(t *testing.T) {
 					}},
 				},
 			},
+			wantLength: 4,
 		},
-		// {
-		// 	name:  "convertFromDistribution",
-		// 	input: getDistributionCheckpoint(t, 123),
-		// 	want: []*prompb.TimeSeries{
-		// 		&prompb.TimeSeries{
-		// 			Labels: []*prompb.Label{
-		// 				{
-		// 					Name:  "R",
-		// 					Value: "V",
-		// 				},
-		// 				{
-		// 					Name:  "name",
-		// 					Value: "metric_name",
-		// 				},
-		// 			},
-		// 			Samples: []prompb.Sample{{
-		// 				Value:     123,
-		// 				Timestamp: mockTime,
-		// 			}},
-		// 		},
-		// 	},
-		// },
 	}
 
 	for _, tt := range tests {
@@ -261,6 +236,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 			want := tt.want
 
 			assert.Nil(t, err, "ConvertToTimeSeries error")
+			assert.Len(t, got, tt.wantLength, "Incorrect number of timeseries")
 			cmp.Equal(got, want)
 		})
 	}
