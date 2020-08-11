@@ -108,7 +108,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 
 		assert.Nil(t, err, "ConvertToTimeSeries error")
 		assert.Len(t, got, 1, "Expected one timeseries")
-		assert.ElementsMatch(t, got, want)
+		cmp.Equal(got, want)
 	})
 
 	// Test conversions based on aggregation type
@@ -161,7 +161,76 @@ func TestConvertToTimeSeries(t *testing.T) {
 				},
 			},
 		},
-		// TODO: Add MinMaxSumCount test case
+		{
+			name:  "convertFromMinMaxSumCount",
+			input: getMMSCCheckpoint(t, 123.456, 876.543),
+			want: []*prompb.TimeSeries{
+				&prompb.TimeSeries{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "name",
+							Value: "metric_name",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     999.999,
+						Timestamp: mockTime,
+					}},
+				},
+				&prompb.TimeSeries{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "name",
+							Value: "metric_name_min",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     123.456,
+						Timestamp: mockTime,
+					}},
+				},
+				&prompb.TimeSeries{
+					Labels: []*prompb.Label{
+						{
+							Name:  "name",
+							Value: "metric_name_max",
+						},
+						{
+							Name:  "R",
+							Value: "V",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     876.543,
+						Timestamp: mockTime,
+					}},
+				},
+				&prompb.TimeSeries{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "name",
+							Value: "metric_name_count",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     2,
+						Timestamp: mockTime,
+					}},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -170,7 +239,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 			want := tt.want
 
 			assert.Nil(t, err, "ConvertToTimeSeries error")
-			assert.ElementsMatch(t, got, want)
+			cmp.Equal(got, want)
 		})
 	}
 }

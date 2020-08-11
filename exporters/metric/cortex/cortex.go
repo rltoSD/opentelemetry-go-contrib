@@ -157,7 +157,7 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 	}
 	// Create sample from Sum value
 	sample := prompb.Sample{
-		Value:     float64(value),
+		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
 		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
 	}
 
@@ -184,7 +184,7 @@ func convertFromLastValue(record metric.Record, lv aggregation.LastValue) (*prom
 
 	// Create sample from Last value
 	sample := prompb.Sample{
-		Value:     float64(value),
+		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
 		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
 	}
 
@@ -209,7 +209,7 @@ func convertFromMinMaxSumCount(record metric.Record, mmsc aggregation.MinMaxSumC
 		return nil, err
 	}
 	minSample := prompb.Sample{
-		Value:     float64(min),
+		Value:     min.CoerceToFloat64(record.Descriptor().NumberKind()),
 		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
 	}
 
@@ -229,7 +229,7 @@ func convertFromMinMaxSumCount(record metric.Record, mmsc aggregation.MinMaxSumC
 		return nil, err
 	}
 	maxSample := prompb.Sample{
-		Value:     float64(max),
+		Value:     max.CoerceToFloat64(record.Descriptor().NumberKind()),
 		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
 	}
 
