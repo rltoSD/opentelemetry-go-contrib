@@ -46,14 +46,11 @@ func (e *Exporter) ExportKindFor(*apimetric.Descriptor, aggregation.Kind) metric
 
 // Export forwards metrics to Cortex from the SDK
 func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet) error {
-	timeSeries, err := e.ConvertToTimeSeries(checkpointSet)
+	_, err := e.ConvertToTimeSeries(checkpointSet)
 	if err != nil {
 		return err
 	}
-
-	// Temporary print statement to keep Go happy (unused variables)
-	fmt.Printf("%v", timeSeries)
-
+	
 	return nil
 }
 
@@ -124,9 +121,8 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			timeSeries = append(timeSeries, tSeries...)
 
 			// Check if aggregation has Distribution value
-			if distribution, ok := agg.(aggregation.Distribution); ok {
-				// Temporary print statement to keep Go happy (unused variables)
-				fmt.Printf("%+v\n", distribution)
+			if _, ok := agg.(aggregation.Distribution); ok {
+				
 			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
