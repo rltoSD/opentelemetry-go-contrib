@@ -51,6 +51,7 @@ func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet)
 		return err
 	}
 
+	// Temporary print statement to keep Go happy (unused variables)
 	fmt.Printf("%v", timeSeries)
 
 	return nil
@@ -105,34 +106,35 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 		// Check if aggregation has Sum value
 		if sum, ok := agg.(aggregation.Sum); ok {
-			ts, err := convertFromSum(record, sum)
+			tSeries, err := convertFromSum(record, sum)
 			if err != nil {
 				return err
 			}
 
-			timeSeries = append(timeSeries, ts)
+			timeSeries = append(timeSeries, tSeries)
 		}
 
 		// Check if aggregation has MinMaxSumCount value
-		if mmsc, ok := agg.(aggregation.MinMaxSumCount); ok {
-			ts, err := convertFromMinMaxSumCount(record, mmsc)
+		if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
+			tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
 			if err != nil {
 				return err
 			}
 
-			timeSeries = append(timeSeries, ts...)
+			timeSeries = append(timeSeries, tSeries...)
 
 			// Check if aggregation has Distribution value
-			if dist, ok := agg.(aggregation.Distribution); ok {
-				fmt.Printf("%+v\n", dist)
+			if distribution, ok := agg.(aggregation.Distribution); ok {
+				// Temporary print statement to keep Go happy (unused variables)
+				fmt.Printf("%+v\n", distribution)
 			}
-		} else if lv, ok := agg.(aggregation.LastValue); ok {
-			ts, err := convertFromLastValue(record, lv)
+		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
+			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
 				return err
 			}
 
-			timeSeries = append(timeSeries, ts)
+			timeSeries = append(timeSeries, tSeries)
 		}
 
 		// TODO: Convert Histogram values
@@ -166,18 +168,18 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 	labels := createLabelSet(record, "name", name)
 
 	// Create TimeSeries and return
-	ts := &prompb.TimeSeries{
+	tSeries := &prompb.TimeSeries{
 		Samples: []prompb.Sample{sample},
 		Labels:  labels,
 	}
 
-	return ts, nil
+	return tSeries, nil
 }
 
 // convertFromLastValue returns a single TimeSeries based on a Record with a LastValue aggregation
-func convertFromLastValue(record metric.Record, lv aggregation.LastValue) (*prompb.TimeSeries, error) {
+func convertFromLastValue(record metric.Record, lastValue aggregation.LastValue) (*prompb.TimeSeries, error) {
 	// Get value
-	value, _, err := lv.LastValue()
+	value, _, err := lastValue.LastValue()
 	if err != nil {
 		return nil, err
 	}
@@ -193,18 +195,18 @@ func convertFromLastValue(record metric.Record, lv aggregation.LastValue) (*prom
 	labels := createLabelSet(record, "name", name)
 
 	// Create TimeSeries and return
-	ts := &prompb.TimeSeries{
+	tSeries := &prompb.TimeSeries{
 		Samples: []prompb.Sample{sample},
 		Labels:  labels,
 	}
 
-	return ts, nil
+	return tSeries, nil
 }
 
 // convertFromMinMaxSumCount returns 4 TimeSeries for the min, max, sum, and count from the mmsc aggregation
-func convertFromMinMaxSumCount(record metric.Record, mmsc aggregation.MinMaxSumCount) ([]*prompb.TimeSeries, error) {
+func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.MinMaxSumCount) ([]*prompb.TimeSeries, error) {
 	// Convert Min
-	min, err := mmsc.Min()
+	min, err := minMaxSumCount.Min()
 	if err != nil {
 		return nil, err
 	}
@@ -218,13 +220,13 @@ func convertFromMinMaxSumCount(record metric.Record, mmsc aggregation.MinMaxSumC
 	labels := createLabelSet(record, "name", name)
 
 	// Create TimeSeries
-	minTs := &prompb.TimeSeries{
+	minTimeSeries := &prompb.TimeSeries{
 		Samples: []prompb.Sample{minSample},
 		Labels:  labels,
 	}
 
 	// Convert Max
-	max, err := mmsc.Max()
+	max, err := minMaxSumCount.Max()
 	if err != nil {
 		return nil, err
 	}
@@ -238,13 +240,13 @@ func convertFromMinMaxSumCount(record metric.Record, mmsc aggregation.MinMaxSumC
 	labels = createLabelSet(record, "name", name)
 
 	// Create TimeSeries
-	maxTs := &prompb.TimeSeries{
+	maxTimeSeries := &prompb.TimeSeries{
 		Samples: []prompb.Sample{maxSample},
 		Labels:  labels,
 	}
 
 	// Convert Count
-	count, err := mmsc.Count()
+	count, err := minMaxSumCount.Count()
 	if err != nil {
 		return nil, err
 	}
@@ -258,16 +260,16 @@ func convertFromMinMaxSumCount(record metric.Record, mmsc aggregation.MinMaxSumC
 	labels = createLabelSet(record, "name", name)
 
 	// Create TimeSeries
-	countTs := &prompb.TimeSeries{
+	countTimeSeries := &prompb.TimeSeries{
 		Samples: []prompb.Sample{countSample},
 		Labels:  labels,
 	}
 
-	ts := []*prompb.TimeSeries{
-		minTs, maxTs, countTs,
+	tSeries := []*prompb.TimeSeries{
+		minTimeSeries, maxTimeSeries, countTimeSeries,
 	}
 
-	return ts, nil
+	return tSeries, nil
 }
 
 // createLabelSet combines labels from a Record, resource, and extra labels to
