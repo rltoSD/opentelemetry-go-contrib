@@ -29,7 +29,7 @@ var validConfig = Config{
 		"username": "user",
 		"password": "password",
 	},
-	BearerToken:     "qwerty12345",
+	BearerToken:     "",
 	BearerTokenFile: "",
 	TLSConfig: map[string]string{
 		"ca_file":              "cafile",

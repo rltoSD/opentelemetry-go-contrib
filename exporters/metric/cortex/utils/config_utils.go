@@ -1,3 +1,17 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package utils
 
 import (
@@ -24,19 +38,6 @@ func (o filepathOption) Apply(config *cortex.Config) {
 	viper.AddConfigPath(string(o))
 }
 
-// WithClient adds a custom http.Client to the Config struct.
-func WithClient(client *http.Client) Option {
-	return clientOption{client}
-}
-
-type clientOption struct {
-	client *http.Client
-}
-
-func (o clientOption) Apply(config *cortex.Config) {
-	config.Client = (*http.Client)(o.client)
-}
-
 // WithFilesystem tells Viper which file system to search for the YAML file in. By default, Viper
 // will search the OS file system, but users can pass in an in-memory filesystem for testing.
 func WithFilesystem(fs afero.Fs) Option {
@@ -51,8 +52,21 @@ func (o fsOption) Apply(config *cortex.Config) {
 	viper.SetFs(o.fs)
 }
 
-// NewConfig creates a Config struct with a YAML file and applies Option functions to the Config
-// struct.
+// WithClient adds a custom http.Client to the Config struct.
+func WithClient(client *http.Client) Option {
+	return clientOption{client}
+}
+
+type clientOption struct {
+	client *http.Client
+}
+
+func (o clientOption) Apply(config *cortex.Config) {
+	config.Client = (*http.Client)(o.client)
+}
+
+// NewConfig creates a Config struct with a YAML file and applies Option functions to the
+// Config struct.
 func NewConfig(filename string, opts ...Option) (*cortex.Config, error) {
 	var config cortex.Config
 

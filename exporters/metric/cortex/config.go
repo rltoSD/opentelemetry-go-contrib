@@ -1,20 +1,37 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cortex
 
 import (
 	"fmt"
-	"net"
 	"net/http"
-	"net/url"
 	"time"
 )
 
 var (
-	// ErrTwoPasswords is an error for when the YAML file contains both `password` and `password_file`.
+	// ErrTwoPasswords occurs when the YAML file contains both `password` and
+	// `password_file`.
 	ErrTwoPasswords = fmt.Errorf("Cannot have two passwords in the YAML file")
 
-	// ErrTwoBearerTokens is an error for when the YAML file contains both `bearer_token` and
+	// ErrTwoBearerTokens occurs when the YAML file contains both `bearer_token` and
 	// `bearer_token_file`.
 	ErrTwoBearerTokens = fmt.Errorf("Cannot have two bearer tokens in the YAML file")
+
+	// ErrConflictingAuthorization occurs when the YAML file contains both BasicAuth and
+	// bearer token authorization
+	ErrConflictingAuthorization = fmt.Errorf("Cannot have both basic auth and bearer token authorization")
 )
 
 // Config contains properties the Exporter uses to export metrics data to Cortex.
@@ -36,11 +53,16 @@ type Config struct {
 // Additionally, it adds default values to missing properties when there is a default.
 func (c *Config) Validate() error {
 	// Check for mutually exclusive properties.
+	if c.BasicAuth != nil {
+		if c.BearerToken != "" || c.BearerTokenFile != "" {
+			return ErrConflictingAuthorization
+		}
+		if c.BasicAuth["password"] != "" && c.BasicAuth["password_file"] != "" {
+			return ErrTwoPasswords
+		}
+	}
 	if c.BearerToken != "" && c.BearerTokenFile != "" {
 		return ErrTwoBearerTokens
-	}
-	if c.BasicAuth["password"] != "" && c.BasicAuth["password_file"] != "" {
-		return ErrTwoPasswords
 	}
 
 	// Add default values for missing properties.
@@ -53,37 +75,6 @@ func (c *Config) Validate() error {
 	// Default time interval between pushes for the push controller is 10s.
 	if c.PushInterval == 0 {
 		c.PushInterval = 10 * time.Second
-	}
-	if c.Client == nil && c.ProxyURL != "" {
-		// Create a custom transport with a proxy URL. This is the same as the http.DefaultTransport
-		// other than the proxy.
-		parsedProxyURL, err := url.Parse(c.ProxyURL)
-		if err != nil {
-			return err
-		}
-
-		// Client is the same as http.DefaultClient other than the proxy and the timeout.
-		c.Client = &http.Client{
-			Timeout: c.RemoteTimeout,
-			Transport: &http.Transport{
-				Proxy: http.ProxyURL(parsedProxyURL),
-				DialContext: (&net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 30 * time.Second,
-					DualStack: true,
-				}).DialContext,
-				ForceAttemptHTTP2:     true,
-				MaxIdleConns:          100,
-				IdleConnTimeout:       90 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			},
-		}
-	}
-	if c.Client == nil {
-		c.Client = &http.Client{
-			Timeout: c.RemoteTimeout,
-		}
 	}
 
 	return nil

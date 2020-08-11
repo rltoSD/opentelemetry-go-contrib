@@ -1,3 +1,17 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package utils_test
 
 import (
@@ -11,129 +25,6 @@ import (
 	"go.opentelemetry.io/contrib/exporters/metric/cortex"
 	"go.opentelemetry.io/contrib/exporters/metric/cortex/utils"
 )
-
-// This is an example YAML file that produces a Config struct without errors.
-var validYAML = []byte(`url: /api/prom/push
-remote_timeout: 30s
-push_interval: 5s
-name: Valid Config Example
-basic_auth:
-  username: user
-  password: password
-bearer_token: qwerty12345
-tls_config:
-  ca_file: cafile
-  cert_file: certfile
-  key_file: keyfile
-  server_name: server
-  insecure_skip_verify: true
-headers:
-  test: header 
-`)
-
-// YAML file with no remote_timout property. It should produce a Config struct without errors.
-var noTimeoutYAML = []byte(`url: /api/prom/push
-push_interval: 5s
-name: Valid Config Example
-basic_auth:
-  username: user
-  password: password
-bearer_token: qwerty12345
-tls_config:
-  ca_file: cafile
-  cert_file: certfile
-  key_file: keyfile
-  server_name: server
-  insecure_skip_verify: true
-headers:
-  test: header
-`)
-
-// YAML file with no endpoint. It should fail to produce a Config struct.
-var noEndpointYAML = []byte(`remote_timeout: 30s
-push_interval: 5s
-name: Valid Config Example
-basic_auth:
-  username: user
-  password: password
-bearer_token: qwerty12345
-tls_config:
-  ca_file: cafile
-  cert_file: certfile
-  key_file: keyfile
-  server_name: server
-  insecure_skip_verify: true
-headers:
-  test: header
-`)
-
-// YAML file with both password and password_file properties. It should fail to produce a Config
-// struct since password and password_file are mutually exclusive.
-var twoPasswordsYAML = []byte(`url: /api/prom/push
-remote_timeout: 30s
-name: Valid Config Example
-basic_auth:
-  username: user
-  password: password
-  password_file: passwordfile
-bearer_token: qwerty12345
-tls_config:
-  ca_file: cafile
-  cert_file: certfile
-  key_file: keyfile
-  server_name: server
-  insecure_skip_verify: true
-headers:
-  test: header
-`)
-
-// YAML file with both bearer_token and bearer_token_file properties. It should fail to produce a
-// Config struct since bearer_token and bearer_token_file are mutually exclusive.
-var twoBearerTokensYAML = []byte(`url: /api/prom/push
-remote_timeout: 30s
-name: Valid Config Example
-basic_auth:
-  username: user
-  password: password
-bearer_token: qwerty12345
-bearer_token_file: bearertokenfile
-tls_config:
-  ca_file: cafile
-  cert_file: certfile
-  key_file: keyfile
-  server_name: server
-  insecure_skip_verify: true
-headers:
-  test: header
-`)
-
-// ValidConfig is the resulting Config struct from reading validYAML.
-var validConfig = cortex.Config{
-	Endpoint:      "/api/prom/push",
-	RemoteTimeout: 30 * time.Second,
-	Name:          "Valid Config Example",
-	BasicAuth: map[string]string{
-		"username": "user",
-		"password": "password",
-	},
-	BearerToken:     "qwerty12345",
-	BearerTokenFile: "",
-	TLSConfig: map[string]string{
-		"ca_file":              "cafile",
-		"cert_file":            "certfile",
-		"key_file":             "keyfile",
-		"server_name":          "server",
-		"insecure_skip_verify": "1",
-	},
-	ProxyURL:     "",
-	PushInterval: 5 * time.Second,
-	Headers: map[string]string{
-		"test": "header",
-	},
-	Client: &http.Client{
-		Timeout: 30 * time.Second,
-	},
-}
 
 // initYAML creates a YAML file at a given filepath in a in-memory file system.
 func initYAML(yamlBytes []byte, path string) (afero.Fs, error) {
@@ -154,8 +45,9 @@ func initYAML(yamlBytes []byte, path string) (afero.Fs, error) {
 	return fs, nil
 }
 
-// TestNewConfig tests whether NewConfig returns a correct Config struct. It checks whether the YAML
-// file was read correctly and whether validation of the struct succeeded.
+// TestNewConfig tests whether NewConfig returns a correct Config struct. It checks
+// whether the YAML file was read correctly and whether validation of the struct
+// succeeded.
 func TestNewConfig(t *testing.T) {
 	tests := []struct {
 		testName       string
@@ -214,7 +106,8 @@ func TestNewConfig(t *testing.T) {
 			fs, err := initYAML(test.yamlByteString, fullPath)
 			require.Nil(t, err)
 
-			// Create new Config struct from the specified YAML file with an in-memory filesystem.
+			// Create new Config struct from the specified YAML file with an in-memory
+			// filesystem.
 			config, err := utils.NewConfig(
 				test.fileName,
 				utils.WithFilepath(test.directoryPath),
@@ -228,8 +121,8 @@ func TestNewConfig(t *testing.T) {
 	}
 }
 
-// TestWithFilepath tests whether NewConfig can find a YAML file that is not in the current
-// directory.
+// TestWithFilepath tests whether NewConfig can find a YAML file that is not in the
+// current directory.
 func TestWithFilepath(t *testing.T) {
 	tests := []struct {
 		testName       string
@@ -261,9 +154,10 @@ func TestWithFilepath(t *testing.T) {
 			fs, err := initYAML(test.yamlByteString, fullPath)
 			require.Nil(t, err)
 
-			// Create new Config struct from the specified YAML file with an in-memory filesystem.
-			// If a path is added, Viper should be able to find the file and there should be no
-			// error. Otherwise, an error should occur as Viper cannot find the file.
+			// Create new Config struct from the specified YAML file with an in-memory
+			// filesystem. If a path is added, Viper should be able to find the file and
+			// there should be no error. Otherwise, an error should occur as Viper cannot
+			// find the file.
 			if test.addPath {
 				_, err := utils.NewConfig(
 					test.fileName,
@@ -279,7 +173,8 @@ func TestWithFilepath(t *testing.T) {
 	}
 }
 
-// TestWithClient tests whether NewConfig successfully adds a HTTP client to the Config struct.
+// TestWithClient tests whether NewConfig successfully adds a HTTP client to the Config
+// struct.
 func TestWithClient(t *testing.T) {
 	// Create a YAML file.
 	fs, err := initYAML(validYAML, "/test/config.yml")
