@@ -24,6 +24,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
+
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/api/label"
 	apimetric "go.opentelemetry.io/otel/api/metric"
@@ -46,11 +47,26 @@ func (e *Exporter) ExportKindFor(*apimetric.Descriptor, aggregation.Kind) metric
 
 // Export forwards metrics to Cortex from the SDK
 func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet) error {
-	_, err := e.ConvertToTimeSeries(checkpointSet)
+	timeseries, err := e.ConvertToTimeSeries(checkpointSet)
 	if err != nil {
 		return err
 	}
-	
+
+	message, buildMessageErr := e.buildMessage(timeseries)
+	if buildMessageErr != nil {
+		return buildMessageErr
+	}
+
+	request, buildRequestErr := e.buildRequest(message)
+	if buildRequestErr != nil {
+		return buildRequestErr
+	}
+
+	sendRequestErr := e.sendRequest(request)
+	if sendRequestErr != nil {
+		return sendRequestErr
+	}
+
 	return nil
 }
 
@@ -121,11 +137,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			}
 
 			timeSeries = append(timeSeries, tSeries...)
-
-			// Check if aggregation has Distribution value
-			if _, ok := agg.(aggregation.Distribution); ok {
-				
-			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -134,8 +145,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 			timeSeries = append(timeSeries, tSeries)
 		}
-
-		// TODO: Convert Histogram values
 
 		return nil
 	})
@@ -163,7 +172,7 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries and return
 	tSeries := &prompb.TimeSeries{
@@ -190,7 +199,7 @@ func convertFromLastValue(record metric.Record, lastValue aggregation.LastValue)
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries and return
 	tSeries := &prompb.TimeSeries{
@@ -215,7 +224,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name() + "_min")
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	minTimeSeries := &prompb.TimeSeries{
@@ -235,7 +244,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_max")
-	labels = createLabelSet(record, "name", name)
+	labels = createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	maxTimeSeries := &prompb.TimeSeries{
@@ -255,7 +264,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_count")
-	labels = createLabelSet(record, "name", name)
+	labels = createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	countTimeSeries := &prompb.TimeSeries{
@@ -332,11 +341,31 @@ func (e *Exporter) addHeaders(req *http.Request) {
 	}
 }
 
-// BuildRequest creates an http POST request with a []byte as the body and headers attached.
+// buildMessage creates a Snappy-compressed protobuf message from a slice of TimeSeries.
+func (e *Exporter) buildMessage(timeseries []*prompb.TimeSeries) ([]byte, error) {
+	// Wrap the TimeSeries as a WriteRequest since Cortex requires it.
+	writeRequest := &prompb.WriteRequest{
+		Timeseries: timeseries,
+	}
+
+	// Convert the struct to a slice of bytes and then compress it.
+	message, err := proto.Marshal(writeRequest)
+	if err != nil {
+		return nil, err
+	}
+	compressed := snappy.Encode(nil, message)
+
+	return compressed, nil
+}
+
+// buildRequest creates an http POST request with a Snappy-compressed protocol buffer
+// message as the body and with all the headers attached.
 func (e *Exporter) buildRequest(message []byte) (*http.Request, error) {
-	// Create the request with the endpoint and message. The message should be a Snappy-compressed
-	// protobuf message.
-	req, err := http.NewRequest(http.MethodPost, e.config.Endpoint, bytes.NewBuffer(message))
+	req, err := http.NewRequest(
+		http.MethodPost,
+		e.config.Endpoint,
+		bytes.NewBuffer(message),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -347,28 +376,14 @@ func (e *Exporter) buildRequest(message []byte) (*http.Request, error) {
 	return req, nil
 }
 
-// BuildMessage creates a Snappy-compressed protobuf message from a slice of TimeSeries.
-func (e *Exporter) buildMessage(timeseries []*prompb.TimeSeries) ([]byte, error) {
-	// Wrap the TimeSeries as a WriteRequest since Cortex requires it.
-	writeRequest := &prompb.WriteRequest{
-		Timeseries: timeseries,
-	}
-
-	// Convert the struct to a slice of bytes.
-	message, err := proto.Marshal(writeRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	// Compress the message.
-	compressed := snappy.Encode(nil, message)
-
-	return compressed, nil
-}
-
-// SendRequest sends an http request using the Exporter's http Client. It will not handle retry
-// logic as retrying can more harmful than helpful
+// sendRequest sends an http request using the Exporter's http Client.
 func (e *Exporter) sendRequest(req *http.Request) error {
+	// Set a client if the user didn't provide one.
+	if e.config.Client == nil {
+		e.config.Client = http.DefaultClient
+		e.config.Client.Timeout = e.config.RemoteTimeout
+	}
+
 	// Attempt to send request.
 	res, err := e.config.Client.Do(req)
 	if err != nil {
@@ -377,11 +392,8 @@ func (e *Exporter) sendRequest(req *http.Request) error {
 	defer res.Body.Close()
 
 	// The response should have a status code of 200.
-	// See https://github.com/prometheus/prometheus/blob/master/storage/remote/client.go#L272.
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Failed to send the HTTP request with status code %v", res.StatusCode)
+		return fmt.Errorf("%v", res.Status)
 	}
-
-	// Request was successfully sent if the request status code is 200.
 	return nil
 }
