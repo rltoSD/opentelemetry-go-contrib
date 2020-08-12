@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package cortex
 
 import (
@@ -23,12 +24,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/sdk/export/metric"
@@ -76,6 +78,7 @@ func TestExportKindFor(t *testing.T) {
 		t.Errorf("ExportKindFor() =  %q, want %q", got, want)
 	}
 }
+
 
 func TestConvertToTimeSeries(t *testing.T) {
 	// Setup
@@ -242,8 +245,9 @@ func TestConvertToTimeSeries(t *testing.T) {
 	}
 }
 
-// TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with the same
-// Config struct as the one passed in.
+
+// TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with
+// the same Config struct as the one passed in.
 func TestNewRawExporter(t *testing.T) {
 	exporter, err := NewRawExporter(validConfig)
 	if err != nil {
@@ -255,9 +259,9 @@ func TestNewRawExporter(t *testing.T) {
 	}
 }
 
-// TestNewExportPipeline tests whether a push Controller was successfully created with an Exporter
-// from New RawExporter. Errors in this function will be from calls to push controller package and
-// NewRawExport. Both have their own tests.
+// TestNewExportPipeline tests whether a push Controller was successfully created with an
+// Exporter from NewRawExporter. Errors in this function will be from calls to push
+// controller package and NewRawExport. Both have their own tests.
 func TestNewExportPipeline(t *testing.T) {
 	_, err := NewExportPipeline(validConfig)
 	if err != nil {
@@ -265,8 +269,8 @@ func TestNewExportPipeline(t *testing.T) {
 	}
 }
 
-// TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push Controller
-// and whether that controller's Provider is registered globally.
+// TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push
+// Controller and whether that controller's Provider is registered globally.
 func TestInstallNewPipeline(t *testing.T) {
 	pusher, err := InstallNewPipeline(validConfig)
 	if err != nil {
