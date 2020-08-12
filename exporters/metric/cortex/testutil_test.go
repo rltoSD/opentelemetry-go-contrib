@@ -19,6 +19,7 @@ import (
 
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/require"
+
 	"go.opentelemetry.io/otel/api/metric"
 	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/metrictest"
