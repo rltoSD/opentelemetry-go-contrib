@@ -121,7 +121,8 @@ func (t *SecureTransport) addBasicAuth(req *http.Request) error {
 		if err != nil {
 			return ErrFailedToReadFile
 		}
-		req.SetBasicAuth(username, string(file))
+		password := string(file)
+		req.SetBasicAuth(username, password)
 		return nil
 	}
 

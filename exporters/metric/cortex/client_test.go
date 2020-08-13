@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -28,12 +29,14 @@ import (
 // correct Authorization header added.
 func TestSecureTransport(t *testing.T) {
 	tests := []struct {
-		testName                string
-		basicAuth               map[string]string
-		bearerToken             string
-		bearerTokenFile         string
-		expectedAuthHeaderValue string
-		expectedError           error
+		testName                      string
+		basicAuth                     map[string]string
+		basicAuthPasswordFileContents []byte
+		bearerToken                   string
+		bearerTokenFile               string
+		bearerTokenFileContents       []byte
+		expectedAuthHeaderValue       string
+		expectedError                 error
 	}{
 		{
 			testName: "Basic Auth with password",
@@ -63,6 +66,18 @@ func TestSecureTransport(t *testing.T) {
 			expectedError:           ErrNoBasicAuthPassword,
 		},
 		{
+			testName: "Basic Auth with password file",
+			basicAuth: map[string]string{
+				"username":      "TestUser",
+				"password_file": "passwordFile",
+			},
+			basicAuthPasswordFileContents: []byte("TestPassword"),
+			expectedAuthHeaderValue: "Basic " + base64.StdEncoding.EncodeToString(
+				[]byte("TestUser:TestPassword"),
+			),
+			expectedError: nil,
+		},
+		{
 			testName: "Basic Auth with bad password file",
 			basicAuth: map[string]string{
 				"username":      "TestUser",
@@ -83,6 +98,13 @@ func TestSecureTransport(t *testing.T) {
 			expectedAuthHeaderValue: "",
 			expectedError:           ErrFailedToReadFile,
 		},
+		{
+			testName:                "Bearer Token with bearer token file",
+			bearerTokenFile:         "bearerTokenFile",
+			expectedAuthHeaderValue: "Bearer testToken",
+			bearerTokenFileContents: []byte("testToken"),
+			expectedError:           nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
@@ -102,6 +124,23 @@ func TestSecureTransport(t *testing.T) {
 				bearerToken:     test.bearerToken,
 				bearerTokenFile: test.bearerTokenFile,
 				rt:              http.DefaultTransport,
+			}
+
+			// Create the necessary files for tests.
+			if test.basicAuth != nil {
+				passwordFile := test.basicAuth["password_file"]
+				if passwordFile != "" && test.basicAuthPasswordFileContents != nil {
+					filepath := "./" + test.basicAuth["password_file"]
+					err := createFile(test.basicAuthPasswordFileContents, filepath)
+					require.Nil(t, err)
+					defer os.Remove(filepath)
+				}
+			}
+			if test.bearerTokenFile != "" && test.bearerTokenFileContents != nil {
+				filepath := "./" + test.bearerTokenFile
+				err := createFile(test.bearerTokenFileContents, filepath)
+				require.Nil(t, err)
+				defer os.Remove(filepath)
 			}
 
 			// Verify that the Transport successfully added the Authorization header.
@@ -125,4 +164,13 @@ func TestSecureTransport(t *testing.T) {
 			}
 		})
 	}
+}
+
+// createFile writes a file with a slice of bytes at a specified filepath.
+func createFile(bytes []byte, filepath string) error {
+	err := ioutil.WriteFile(filepath, bytes, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
