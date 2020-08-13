@@ -23,7 +23,6 @@ func (e *Exporter) buildClient() (*http.Client, error) {
 		basicAuth:       e.config.BasicAuth,
 		bearerToken:     e.config.BearerToken,
 		bearerTokenFile: e.config.BearerTokenFile,
-		tlsConfig:       e.config.TLSConfig,
 	}
 	secureClient := http.Client{
 		Transport: secureTransport,
@@ -32,17 +31,17 @@ func (e *Exporter) buildClient() (*http.Client, error) {
 	return &secureClient, nil
 }
 
-// SecureTransport implements http.RoundTripper. It sets up the client to use TLS and adds
-// Authorization headers using the basic authentication or bearer tokens if they are
-// provided by the user.
+// SecureTransport implements http.RoundTripper. It is a custom http.Transport that
+// authenticates the request by adding Authorization headers.
 type SecureTransport struct {
 	basicAuth       map[string]string
 	bearerToken     string
 	bearerTokenFile string
-	tlsConfig       map[string]string
 	rt              http.RoundTripper
 }
 
+// RoundTrip intercepts http requests and adds Authorization headers using the basic
+// authentication or bearer tokens if they are provided by the user.
 func (t *SecureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.rt.RoundTrip(req)
 }
