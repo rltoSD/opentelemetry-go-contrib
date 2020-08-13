@@ -15,6 +15,8 @@
 package cortex
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -132,5 +134,66 @@ func (t *SecureTransport) addBearerTokenAuth(req *http.Request) error {
 		req.Header.Set("Authorization", bearerTokenString)
 	}
 
+	return nil
+}
+
+// buildTLSConfig uses the TLSConfig map in Config to create a tls.Config struct.
+func (e *Exporter) buildTLSConfig() (*tls.Config, error) {
+	tlsConfig := &tls.Config{}
+	if e.config.TLSConfig == nil {
+		return tlsConfig, nil
+	}
+
+	// Set the server name if it exists.
+	if e.config.TLSConfig["server_name"] != "" {
+		tlsConfig.ServerName = e.config.TLSConfig["server_name"]
+	}
+
+	// Set InsecureSkipVerify. Viper reads the bool as a string since it is in a map.
+	if e.config.TLSConfig["insecure_skip_verify"] == "1" {
+		tlsConfig.InsecureSkipVerify = true
+	} else {
+		tlsConfig.InsecureSkipVerify = false
+	}
+
+	// Load certificates from CA file if it exists.
+	if err := e.loadCACertificates(tlsConfig); err != nil {
+		return nil, err
+	}
+
+	// Load the client certificate if it exists.
+	if err := e.loadClientCertificate(tlsConfig); err != nil {
+		return nil, err
+	}
+
+	return tlsConfig, nil
+}
+
+// loadCACertificates reads a CA file and updates the certificate pool in a tls Config
+// struct.
+func (e *Exporter) loadCACertificates(tlsConfig *tls.Config) error {
+	caFile := e.config.TLSConfig["ca_file"]
+	if caFile != "" {
+		caFileData, err := ioutil.ReadFile(caFile)
+		if err != nil {
+			return err
+		}
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(caFileData)
+		tlsConfig.RootCAs = certPool
+	}
+	return nil
+}
+
+// loadClientCertificate reads a certificate file and key and stores it in a tls Config
+// struct.
+func (e *Exporter) loadClientCertificate(tlsConfig *tls.Config) error {
+	certFile := e.config.TLSConfig["cert_file"]
+	keyFile := e.config.TLSConfig["key_file"]
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return err
+	}
+	tlsConfig.Certificates = []tls.Certificate{cert}
 	return nil
 }
