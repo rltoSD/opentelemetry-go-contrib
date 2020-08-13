@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -350,10 +351,11 @@ func (e *Exporter) addHeaders(req *http.Request) {
 // buildMessage creates a Snappy-compressed protobuf message from a slice of TimeSeries.
 func (e *Exporter) buildMessage(timeseries []*prompb.TimeSeries) ([]byte, error) {
 	// Wrap the TimeSeries as a WriteRequest since Cortex requires it.
+	fmt.Println(timeseries[0])
 	writeRequest := &prompb.WriteRequest{
 		Timeseries: timeseries,
 	}
-
+	fmt.Println(writeRequest)
 	// Convert the struct to a slice of bytes and then compress it.
 	message, err := proto.Marshal(writeRequest)
 	if err != nil {
@@ -399,6 +401,8 @@ func (e *Exporter) sendRequest(req *http.Request) error {
 
 	// The response should have a status code of 200.
 	if res.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(res.Body)
+		fmt.Println(string(body))
 		return fmt.Errorf("%v", res.Status)
 	}
 	return nil
