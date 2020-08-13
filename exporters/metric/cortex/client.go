@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 )
 
 var (
@@ -39,11 +40,31 @@ var (
 // buildClient returns a http client that adds Authorization headers to http requests sent
 // through it and uses TLS.
 func (e *Exporter) buildClient() (*http.Client, error) {
+	// Create a TLS Config struct for use in a custom HTTP Transport.
+	tlsConfig, err := e.buildTLSConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert proxy url to proxy function for use in custom Transport.
+	proxyURL, err := url.Parse(e.config.ProxyURL)
+	if err != nil {
+		return nil, err
+	}
+	proxy := http.ProxyURL(proxyURL)
+
+	// Create a custom HTTP transport for adding headers.
 	secureTransport := &SecureTransport{
 		basicAuth:       e.config.BasicAuth,
 		bearerToken:     e.config.BearerToken,
 		bearerTokenFile: e.config.BearerTokenFile,
+		rt: &http.Transport{
+			Proxy:           proxy,
+			TLSClientConfig: tlsConfig,
+		},
 	}
+
+	// Create and return a client that
 	secureClient := http.Client{
 		Transport: secureTransport,
 		Timeout:   e.config.RemoteTimeout,
