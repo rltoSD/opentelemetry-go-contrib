@@ -14,7 +14,25 @@
 
 package cortex
 
-import "net/http"
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+)
+
+var (
+	// ErrNoBasicAuthUsername occurs when no username was provided for basic
+	// authentication.
+	ErrNoBasicAuthUsername = fmt.Errorf("No username provided for basic authentication")
+
+	// ErrNoBasicAuthPassword occurs when no password or password file was provided for
+	// basic authentication.
+	ErrNoBasicAuthPassword = fmt.Errorf("No password or password file provided for basic authentication")
+
+	// ErrFailedToReadBasicAuthPasswordFile occurs when a password file for basic
+	// authentication exists, but could not be read.
+	ErrFailedToReadBasicAuthPasswordFile = fmt.Errorf("Failed to read password file for basic authentication")
+)
 
 // buildClient returns a http client that adds Authorization headers to http requests sent
 // through it and uses TLS.
@@ -43,5 +61,46 @@ type SecureTransport struct {
 // RoundTrip intercepts http requests and adds Authorization headers using the basic
 // authentication or bearer tokens if they are provided by the user.
 func (t *SecureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return t.rt.RoundTrip(req)
+	// Clone the request since RoundTrip should not modify it.
+	reqContext := req.Context()
+	clonedReq := req.Clone(reqContext)
+
+	// Set basic authentication if the user provided it.
+	if err := t.addBasicAuth(clonedReq); err != nil {
+		return nil, err
+	}
+	return t.rt.RoundTrip(clonedReq)
+}
+
+func (t *SecureTransport) addBasicAuth(req *http.Request) error {
+	if t.basicAuth == nil {
+		return nil
+	}
+
+	// There must be an username for basic authentication.
+	username := t.basicAuth["username"]
+	if username == "" {
+		return fmt.Errorf("No username provided for basic authentication")
+	}
+
+	// Use password from password file if it exists.
+	passwordFile := t.basicAuth["password_file"]
+	if passwordFile != "" {
+		file, err := ioutil.ReadFile(passwordFile)
+		if err != nil {
+			return ErrFailedToReadBasicAuthPasswordFile
+		}
+		password := string(file)
+		req.SetBasicAuth(username, password)
+		return nil
+	}
+
+	// Use provided password.
+	password := t.basicAuth["password"]
+	if password == "" {
+		return ErrNoBasicAuthPassword
+	}
+	req.SetBasicAuth(username, password)
+
+	return nil
 }
