@@ -66,10 +66,22 @@ func TestSecureTransport(t *testing.T) {
 			testName: "Basic Auth with bad password file",
 			basicAuth: map[string]string{
 				"username":      "TestUser",
-				"password_file": "NonexistentPasswordFile",
+				"password_file": "missingPasswordFile",
 			},
 			expectedAuthHeaderValue: "",
-			expectedError:           ErrFailedToReadBasicAuthPasswordFile,
+			expectedError:           ErrFailedToReadFile,
+		},
+		{
+			testName:                "Bearer Token",
+			bearerToken:             "testToken",
+			expectedAuthHeaderValue: "Bearer testToken",
+			expectedError:           nil,
+		},
+		{
+			testName:                "Bearer Token with bad bearer token file",
+			bearerTokenFile:         "missingBearerTokenFile",
+			expectedAuthHeaderValue: "",
+			expectedError:           ErrFailedToReadFile,
 		},
 	}
 	for _, test := range tests {

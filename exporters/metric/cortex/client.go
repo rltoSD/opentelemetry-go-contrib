@@ -29,9 +29,9 @@ var (
 	// basic authentication.
 	ErrNoBasicAuthPassword = fmt.Errorf("No password or password file provided for basic authentication")
 
-	// ErrFailedToReadBasicAuthPasswordFile occurs when a password file for basic
-	// authentication exists, but could not be read.
-	ErrFailedToReadBasicAuthPasswordFile = fmt.Errorf("Failed to read password file for basic authentication")
+	// ErrFailedToReadFile occurs when a password / bearer token file exists, but could
+	// not be read.
+	ErrFailedToReadFile = fmt.Errorf("Failed to read password / bearer token file")
 )
 
 // buildClient returns a http client that adds Authorization headers to http requests sent
@@ -65,13 +65,21 @@ func (t *SecureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	reqContext := req.Context()
 	clonedReq := req.Clone(reqContext)
 
-	// Set basic authentication if the user provided it.
+	// Set authorization header for basic authentication if the user provided it.
 	if err := t.addBasicAuth(clonedReq); err != nil {
 		return nil, err
 	}
+
+	// Set authorization header for bearer token if the user provided it.
+	if err := t.addBearerTokenAuth(clonedReq); err != nil {
+		return nil, err
+	}
+
 	return t.rt.RoundTrip(clonedReq)
 }
 
+// addBasicAuth sets the Authorization header for basic authentication using a username
+// and a password / password file.
 func (t *SecureTransport) addBasicAuth(req *http.Request) error {
 	if t.basicAuth == nil {
 		return nil
@@ -88,10 +96,9 @@ func (t *SecureTransport) addBasicAuth(req *http.Request) error {
 	if passwordFile != "" {
 		file, err := ioutil.ReadFile(passwordFile)
 		if err != nil {
-			return ErrFailedToReadBasicAuthPasswordFile
+			return ErrFailedToReadFile
 		}
-		password := string(file)
-		req.SetBasicAuth(username, password)
+		req.SetBasicAuth(username, string(file))
 		return nil
 	}
 
@@ -101,6 +108,29 @@ func (t *SecureTransport) addBasicAuth(req *http.Request) error {
 		return ErrNoBasicAuthPassword
 	}
 	req.SetBasicAuth(username, password)
+
+	return nil
+}
+
+// addBearerTokenAuth sets the Authorization header for bearer tokens using a bearer token
+// string or a bearer token file.
+func (t *SecureTransport) addBearerTokenAuth(req *http.Request) error {
+	// Use bearer token from bearer token file if it exists.
+	if t.bearerTokenFile != "" {
+		file, err := ioutil.ReadFile(t.bearerTokenFile)
+		if err != nil {
+			return ErrFailedToReadFile
+		}
+		bearerTokenString := "Bearer " + string(file)
+		req.Header.Set("Authorization", bearerTokenString)
+		return nil
+	}
+
+	// Otherwise, use bearer token field.
+	if t.bearerToken != "" {
+		bearerTokenString := "Bearer " + t.bearerToken
+		req.Header.Set("Authorization", bearerTokenString)
+	}
 
 	return nil
 }
