@@ -15,6 +15,7 @@ package cortex
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -173,4 +174,14 @@ func createFile(bytes []byte, filepath string) error {
 		return err
 	}
 	return nil
+}
+
+// TestBuildClient tests whether BuildClient returns a client that works with TLS
+// properly.
+func TestBuildClient(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+	}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(handler))
+	defer server.Close()
 }
