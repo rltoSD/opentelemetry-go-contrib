@@ -93,14 +93,14 @@ func TestConvertToTimeSeries(t *testing.T) {
 			name:  "validCheckpointSet",
 			input: getValidCheckpointSet(t),
 			want: []*prompb.TimeSeries{
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
 							Name:  "R",
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -116,14 +116,14 @@ func TestConvertToTimeSeries(t *testing.T) {
 			name:  "convertFromSum",
 			input: getSumCheckpoint(t, 321),
 			want: []*prompb.TimeSeries{
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
 							Name:  "R",
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -139,14 +139,14 @@ func TestConvertToTimeSeries(t *testing.T) {
 			name:  "convertFromLastValue",
 			input: getLastValueCheckpoint(t, 123),
 			want: []*prompb.TimeSeries{
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
 							Name:  "R",
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -162,14 +162,14 @@ func TestConvertToTimeSeries(t *testing.T) {
 			name:  "convertFromMinMaxSumCount",
 			input: getMMSCCheckpoint(t, 123.456, 876.543),
 			want: []*prompb.TimeSeries{
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
 							Name:  "R",
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -178,14 +178,14 @@ func TestConvertToTimeSeries(t *testing.T) {
 						Timestamp: mockTime,
 					}},
 				},
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
 							Name:  "R",
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name_min",
 						},
 					},
@@ -194,10 +194,10 @@ func TestConvertToTimeSeries(t *testing.T) {
 						Timestamp: mockTime,
 					}},
 				},
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name_max",
 						},
 						{
@@ -210,14 +210,14 @@ func TestConvertToTimeSeries(t *testing.T) {
 						Timestamp: mockTime,
 					}},
 				},
-				&prompb.TimeSeries{
+				{
 					Labels: []*prompb.Label{
 						{
 							Name:  "R",
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name_count",
 						},
 					},

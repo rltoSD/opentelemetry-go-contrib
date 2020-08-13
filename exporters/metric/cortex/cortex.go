@@ -25,6 +25,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
+
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/api/label"
 	apimetric "go.opentelemetry.io/otel/api/metric"
@@ -137,11 +138,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			}
 
 			timeSeries = append(timeSeries, tSeries...)
-
-			// Check if aggregation has Distribution value
-			if _, ok := agg.(aggregation.Distribution); ok {
-
-			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -150,8 +146,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 			timeSeries = append(timeSeries, tSeries)
 		}
-
-		// TODO: Convert Histogram values
 
 		return nil
 	})
@@ -179,7 +173,7 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries and return
 	tSeries := &prompb.TimeSeries{
@@ -206,7 +200,7 @@ func convertFromLastValue(record metric.Record, lastValue aggregation.LastValue)
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries and return
 	tSeries := &prompb.TimeSeries{
@@ -231,7 +225,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name() + "_min")
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	minTimeSeries := &prompb.TimeSeries{
@@ -251,7 +245,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_max")
-	labels = createLabelSet(record, "name", name)
+	labels = createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	maxTimeSeries := &prompb.TimeSeries{
@@ -271,7 +265,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_count")
-	labels = createLabelSet(record, "name", name)
+	labels = createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	countTimeSeries := &prompb.TimeSeries{
@@ -355,7 +349,6 @@ func (e *Exporter) buildMessage(timeseries []*prompb.TimeSeries) ([]byte, error)
 	writeRequest := &prompb.WriteRequest{
 		Timeseries: timeseries,
 	}
-	fmt.Println(writeRequest)
 	// Convert the struct to a slice of bytes and then compress it.
 	message, err := proto.Marshal(writeRequest)
 	if err != nil {
