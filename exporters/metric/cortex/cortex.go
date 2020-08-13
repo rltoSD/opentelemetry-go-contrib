@@ -47,9 +47,24 @@ func (e *Exporter) ExportKindFor(*apimetric.Descriptor, aggregation.Kind) metric
 
 // Export forwards metrics to Cortex from the SDK
 func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet) error {
-	_, err := e.ConvertToTimeSeries(checkpointSet)
+	timeseries, err := e.ConvertToTimeSeries(checkpointSet)
 	if err != nil {
 		return err
+	}
+
+	message, buildMessageErr := e.buildMessage(timeseries)
+	if buildMessageErr != nil {
+		return buildMessageErr
+	}
+
+	request, buildRequestErr := e.buildRequest(message)
+	if buildRequestErr != nil {
+		return buildRequestErr
+	}
+
+	sendRequestErr := e.sendRequest(request)
+	if sendRequestErr != nil {
+		return sendRequestErr
 	}
 
 	return nil
@@ -122,11 +137,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			}
 
 			timeSeries = append(timeSeries, tSeries...)
-
-			// Check if aggregation has Distribution value
-			if _, ok := agg.(aggregation.Distribution); ok {
-
-			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -135,8 +145,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 			timeSeries = append(timeSeries, tSeries)
 		}
-
-		// TODO: Convert Histogram values
 
 		return nil
 	})
@@ -164,7 +172,7 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries and return
 	tSeries := &prompb.TimeSeries{
@@ -191,7 +199,7 @@ func convertFromLastValue(record metric.Record, lastValue aggregation.LastValue)
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries and return
 	tSeries := &prompb.TimeSeries{
@@ -216,7 +224,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name() + "_min")
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	minTimeSeries := &prompb.TimeSeries{
@@ -236,7 +244,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_max")
-	labels = createLabelSet(record, "name", name)
+	labels = createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	maxTimeSeries := &prompb.TimeSeries{
@@ -256,7 +264,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_count")
-	labels = createLabelSet(record, "name", name)
+	labels = createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	countTimeSeries := &prompb.TimeSeries{
