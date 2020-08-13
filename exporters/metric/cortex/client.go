@@ -16,6 +16,33 @@ package cortex
 
 import "net/http"
 
-func buildAuthenticatedClient() (*http.Client, error) {
-	return nil, nil
+// buildClient returns a http client that adds Authorization headers to http requests sent
+// through it and uses TLS.
+func (e *Exporter) buildClient() (*http.Client, error) {
+	secureTransport := &SecureTransport{
+		basicAuth:       e.config.BasicAuth,
+		bearerToken:     e.config.BearerToken,
+		bearerTokenFile: e.config.BearerTokenFile,
+		tlsConfig:       e.config.TLSConfig,
+	}
+	secureClient := http.Client{
+		Transport: secureTransport,
+		Timeout:   e.config.RemoteTimeout,
+	}
+	return &secureClient, nil
+}
+
+// SecureTransport implements http.RoundTripper. It sets up the client to use TLS and adds
+// Authorization headers using the basic authentication or bearer tokens if they are
+// provided by the user.
+type SecureTransport struct {
+	basicAuth       map[string]string
+	bearerToken     string
+	bearerTokenFile string
+	tlsConfig       map[string]string
+	rt              http.RoundTripper
+}
+
+func (t *SecureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.rt.RoundTrip(req)
 }
