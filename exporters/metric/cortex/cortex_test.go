@@ -100,7 +100,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -123,7 +123,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -146,7 +146,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -169,7 +169,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name",
 						},
 					},
@@ -185,7 +185,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name_min",
 						},
 					},
@@ -197,7 +197,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 				{
 					Labels: []*prompb.Label{
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name_max",
 						},
 						{
@@ -217,7 +217,7 @@ func TestConvertToTimeSeries(t *testing.T) {
 							Value: "V",
 						},
 						{
-							Name:  "name",
+							Name:  "__name__",
 							Value: "metric_name_count",
 						},
 					},
