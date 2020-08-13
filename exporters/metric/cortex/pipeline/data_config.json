@@ -1,0 +1,11 @@
+{
+    "instrumentConfigs": [
+        {
+            "type": "VALUERECORDER",
+            "label": "a.valuerecorder",
+            "description": "Records values",
+            "dataPointCount": 1000,
+            "recordInterval": 2
+        }
+    ]
+}

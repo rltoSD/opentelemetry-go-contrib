@@ -46,11 +46,25 @@ func (e *Exporter) ExportKindFor(*apimetric.Descriptor, aggregation.Kind) metric
 
 // Export forwards metrics to Cortex from the SDK
 func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet) error {
-	_, err := e.ConvertToTimeSeries(checkpointSet)
+	timeseries, err := e.ConvertToTimeSeries(checkpointSet)
 	if err != nil {
 		return err
 	}
-	
+
+	message, buildMessageErr := e.buildMessage(timeseries)
+	if buildMessageErr != nil {
+		return buildMessageErr
+	}
+
+	request, buildRequestErr := e.buildRequest(message)
+	if buildRequestErr != nil {
+		return buildRequestErr
+	}
+
+	sendRequestErr := e.sendRequest(request)
+	if sendRequestErr != nil {
+		return sendRequestErr
+	}
 	return nil
 }
 
@@ -90,6 +104,7 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 		return nil, err
 	}
 	global.SetMeterProvider(pusher.Provider())
+	fmt.Println("Install Pipeline Succeeded!")
 	return pusher, nil
 }
 
@@ -124,7 +139,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 			// Check if aggregation has Distribution value
 			if _, ok := agg.(aggregation.Distribution); ok {
-				
+
 			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
