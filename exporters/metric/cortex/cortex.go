@@ -157,6 +157,21 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 	return timeSeries, nil
 }
 
+// createTimeSeries is a helper function to create a timeseries from a value and labels
+func createTimeSeries(record metric.Record, value apimetric.Number, extraLabels ...string) *prompb.TimeSeries {
+	sample := prompb.Sample{
+		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
+		Timestamp: record.EndTime().Unix(),
+	}
+
+	labels := createLabelSet(record, extraLabels...)
+
+	return &prompb.TimeSeries{
+		Samples: []prompb.Sample{sample},
+		Labels:  labels,
+	}
+}
+
 // convertFromSum returns a single TimeSeries based on a Record with a Sum aggregation
 func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeries, error) {
 	// Get Sum value
@@ -164,21 +179,10 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 	if err != nil {
 		return nil, err
 	}
-	// Create sample from Sum value
-	sample := prompb.Sample{
-		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
-	}
 
-	// Create labels, including metric name
+	// Create TimeSeries
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "__name__", name)
-
-	// Create TimeSeries and return
-	tSeries := &prompb.TimeSeries{
-		Samples: []prompb.Sample{sample},
-		Labels:  labels,
-	}
+	tSeries := createTimeSeries(record, value, "__name__", name)
 
 	return tSeries, nil
 }
@@ -191,21 +195,9 @@ func convertFromLastValue(record metric.Record, lastValue aggregation.LastValue)
 		return nil, err
 	}
 
-	// Create sample from Last value
-	sample := prompb.Sample{
-		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
-	}
-
-	// Create labels, including metric name
+	// Create TimeSeries
 	name := sanitize(record.Descriptor().Name())
-	labels := createLabelSet(record, "__name__", name)
-
-	// Create TimeSeries and return
-	tSeries := &prompb.TimeSeries{
-		Samples: []prompb.Sample{sample},
-		Labels:  labels,
-	}
+	tSeries := createTimeSeries(record, value, "__name__", name)
 
 	return tSeries, nil
 }
@@ -217,40 +209,16 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	if err != nil {
 		return nil, err
 	}
-	minSample := prompb.Sample{
-		Value:     min.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
-	}
-
-	// Create labels, including metric name
 	name := sanitize(record.Descriptor().Name() + "_min")
-	labels := createLabelSet(record, "__name__", name)
-
-	// Create TimeSeries
-	minTimeSeries := &prompb.TimeSeries{
-		Samples: []prompb.Sample{minSample},
-		Labels:  labels,
-	}
+	minTimeSeries := createTimeSeries(record, min, "__name__", name)
 
 	// Convert Max
 	max, err := minMaxSumCount.Max()
 	if err != nil {
 		return nil, err
 	}
-	maxSample := prompb.Sample{
-		Value:     max.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
-	}
-
-	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_max")
-	labels = createLabelSet(record, "__name__", name)
-
-	// Create TimeSeries
-	maxTimeSeries := &prompb.TimeSeries{
-		Samples: []prompb.Sample{maxSample},
-		Labels:  labels,
-	}
+	maxTimeSeries := createTimeSeries(record, max, "__name__", name)
 
 	// Convert Count
 	count, err := minMaxSumCount.Count()
@@ -263,8 +231,9 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	}
 
 	// Create labels, including metric name
+	// Count returns an int, not a metric.Number so we aren't using the createTimeSeries
 	name = sanitize(record.Descriptor().Name() + "_count")
-	labels = createLabelSet(record, "__name__", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	countTimeSeries := &prompb.TimeSeries{
