@@ -15,20 +15,18 @@ package cortex
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-// TestSecureTransport checks whether http requests sent using a SecureTransport has the
-// correct Authorization header added.
-func TestSecureTransport(t *testing.T) {
+// TestAuthentication checks whether http requests are properly authenticated with either
+// bearer tokens or basic authentication in the addHeaders method.
+func TestAuthentication(t *testing.T) {
 	tests := []struct {
 		testName                      string
 		basicAuth                     map[string]string
@@ -119,14 +117,6 @@ func TestSecureTransport(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
 
-			// Create a SecureTransport that adds an Authorization header.
-			server.Client().Transport = &SecureTransport{
-				basicAuth:       test.basicAuth,
-				bearerToken:     test.bearerToken,
-				bearerTokenFile: test.bearerTokenFile,
-				rt:              http.DefaultTransport,
-			}
-
 			// Create the necessary files for tests.
 			if test.basicAuth != nil {
 				passwordFile := test.basicAuth["password_file"]
@@ -144,23 +134,25 @@ func TestSecureTransport(t *testing.T) {
 				defer os.Remove(filepath)
 			}
 
-			// Verify that the Transport successfully added the Authorization header.
-			resp, err := server.Client().Get(server.URL)
+			// Create a HTTP request and add headers to it through an Exporter. Since the
+			// Exporter has an empty Headers map, authentication methods will be called.
+			exporter := Exporter{
+				Config{
+					BasicAuth:       test.basicAuth,
+					BearerToken:     test.bearerToken,
+					BearerTokenFile: test.bearerTokenFile,
+				},
+			}
+			req, err := http.NewRequest(http.MethodPost, server.URL, nil)
+			require.Nil(t, err)
+			err = exporter.addHeaders(req)
+
+			// Verify the error and if the Authorization header was correctly set.
 			if err != nil {
-				// Error will be of form: GET "<server url>": error. The server URL
-				// changes each time a test is run, so the test only checks the last part
-				// of the error string.
-				fullError := err.Error()
-				splitError := strings.Split(fullError, ": ")
-				errorString := splitError[len(splitError)-1]
-				require.Equal(t, errorString, test.expectedError.Error())
+				require.Equal(t, err.Error(), test.expectedError.Error())
 			} else {
 				require.Nil(t, test.expectedError)
-
-				// Read body and verify the header value.
-				body, err := ioutil.ReadAll(resp.Body)
-				require.Nil(t, err)
-				authHeaderValue := string(body)
+				authHeaderValue := req.Header.Get("Authorization")
 				require.Equal(t, authHeaderValue, test.expectedAuthHeaderValue)
 			}
 		})
@@ -174,14 +166,4 @@ func createFile(bytes []byte, filepath string) error {
 		return err
 	}
 	return nil
-}
-
-// TestBuildClient tests whether BuildClient returns a client that works with TLS
-// properly.
-func TestBuildClient(t *testing.T) {
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Hello, client")
-	}
-	server := httptest.NewUnstartedServer(http.HandlerFunc(handler))
-	defer server.Close()
 }

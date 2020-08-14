@@ -37,8 +37,84 @@ var (
 	ErrFailedToReadFile = fmt.Errorf("Failed to read password / bearer token file")
 )
 
-// buildClient returns a http client that adds Authorization headers to http requests sent
-// through it and uses TLS.
+// addBasicAuth sets the Authorization header for basic authentication using a username
+// and a password / password file. To prevent the Exporter from potentially opening a
+// password file on every request by calling this method, the Authorization header is also
+// added to the Config header map.
+func (e *Exporter) addBasicAuth(req *http.Request) error {
+	// No need to add basic auth if it isn't provided or if the Authorization header is
+	// already set.
+	if _, exists := e.config.Headers["Authorization"]; exists {
+		return nil
+	}
+	if e.config.BasicAuth == nil {
+		return nil
+	}
+
+	// There must be an username for basic authentication.
+	username := e.config.BasicAuth["username"]
+	if username == "" {
+		return ErrNoBasicAuthUsername
+	}
+
+	// Use password from password file if it exists.
+	passwordFile := e.config.BasicAuth["password_file"]
+	if passwordFile != "" {
+		file, err := ioutil.ReadFile(passwordFile)
+		if err != nil {
+			return ErrFailedToReadFile
+		}
+		password := string(file)
+		req.SetBasicAuth(username, password)
+		e.storeAuthHeader(req.Header.Get("Authorization"))
+		return nil
+	}
+
+	// Use provided password.
+	password := e.config.BasicAuth["password"]
+	if password == "" {
+		return ErrNoBasicAuthPassword
+	}
+	req.SetBasicAuth(username, password)
+	e.storeAuthHeader(req.Header.Get("Authorization"))
+
+	return nil
+}
+
+// addBearerTokenAuth sets the Authorization header for bearer tokens using a bearer token
+// string or a bearer token file. To prevent the Exporter from potentially opening a
+// bearer token file on every request by calling this method, the Authorization header is
+// also added to the Config header map.
+func (e *Exporter) addBearerTokenAuth(req *http.Request) error {
+	// No need to add bearer token auth if the Authorization header is already set.
+	if _, exists := e.config.Headers["Authorization"]; exists {
+		return nil
+	}
+
+	// Use bearer token from bearer token file if it exists.
+	if e.config.BearerTokenFile != "" {
+		file, err := ioutil.ReadFile(e.config.BearerTokenFile)
+		if err != nil {
+			return ErrFailedToReadFile
+		}
+		bearerTokenString := "Bearer " + string(file)
+		req.Header.Set("Authorization", bearerTokenString)
+		e.storeAuthHeader(bearerTokenString)
+		return nil
+	}
+
+	// Otherwise, use bearer token field.
+	if e.config.BearerToken != "" {
+		bearerTokenString := "Bearer " + e.config.BearerToken
+		req.Header.Set("Authorization", bearerTokenString)
+		e.storeAuthHeader(bearerTokenString)
+	}
+
+	return nil
+}
+
+// buildClient returns a http client that uses TLS and has the user-specified proxy and
+// timeout.
 func (e *Exporter) buildClient() (*http.Client, error) {
 	// Create a TLS Config struct for use in a custom HTTP Transport.
 	tlsConfig, err := e.buildTLSConfig()
@@ -53,110 +129,15 @@ func (e *Exporter) buildClient() (*http.Client, error) {
 	}
 	proxy := http.ProxyURL(proxyURL)
 
-	// Create a custom HTTP transport for adding headers.
-	secureTransport := &SecureTransport{
-		basicAuth:       e.config.BasicAuth,
-		bearerToken:     e.config.BearerToken,
-		bearerTokenFile: e.config.BearerTokenFile,
-		rt: &http.Transport{
+	// Create and return a client that
+	client := http.Client{
+		Transport: &http.Transport{
 			Proxy:           proxy,
 			TLSClientConfig: tlsConfig,
 		},
+		Timeout: e.config.RemoteTimeout,
 	}
-
-	// Create and return a client that
-	secureClient := http.Client{
-		Transport: secureTransport,
-		Timeout:   e.config.RemoteTimeout,
-	}
-	return &secureClient, nil
-}
-
-// SecureTransport implements http.RoundTripper. It is a custom http.Transport that
-// authenticates the request by adding Authorization headers.
-type SecureTransport struct {
-	basicAuth       map[string]string
-	bearerToken     string
-	bearerTokenFile string
-	rt              http.RoundTripper
-}
-
-// RoundTrip intercepts http requests and adds Authorization headers using the basic
-// authentication or bearer tokens if they are provided by the user.
-func (t *SecureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request since RoundTrip should not modify it.
-	reqContext := req.Context()
-	clonedReq := req.Clone(reqContext)
-
-	// Set authorization header for basic authentication if the user provided it.
-	if err := t.addBasicAuth(clonedReq); err != nil {
-		return nil, err
-	}
-
-	// Set authorization header for bearer token if the user provided it.
-	if err := t.addBearerTokenAuth(clonedReq); err != nil {
-		return nil, err
-	}
-
-	return t.rt.RoundTrip(clonedReq)
-}
-
-// addBasicAuth sets the Authorization header for basic authentication using a username
-// and a password / password file.
-func (t *SecureTransport) addBasicAuth(req *http.Request) error {
-	if t.basicAuth == nil {
-		return nil
-	}
-
-	// There must be an username for basic authentication.
-	username := t.basicAuth["username"]
-	if username == "" {
-		return fmt.Errorf("No username provided for basic authentication")
-	}
-
-	// Use password from password file if it exists.
-	passwordFile := t.basicAuth["password_file"]
-	if passwordFile != "" {
-		file, err := ioutil.ReadFile(passwordFile)
-		if err != nil {
-			return ErrFailedToReadFile
-		}
-		password := string(file)
-		req.SetBasicAuth(username, password)
-		return nil
-	}
-
-	// Use provided password.
-	password := t.basicAuth["password"]
-	if password == "" {
-		return ErrNoBasicAuthPassword
-	}
-	req.SetBasicAuth(username, password)
-
-	return nil
-}
-
-// addBearerTokenAuth sets the Authorization header for bearer tokens using a bearer token
-// string or a bearer token file.
-func (t *SecureTransport) addBearerTokenAuth(req *http.Request) error {
-	// Use bearer token from bearer token file if it exists.
-	if t.bearerTokenFile != "" {
-		file, err := ioutil.ReadFile(t.bearerTokenFile)
-		if err != nil {
-			return ErrFailedToReadFile
-		}
-		bearerTokenString := "Bearer " + string(file)
-		req.Header.Set("Authorization", bearerTokenString)
-		return nil
-	}
-
-	// Otherwise, use bearer token field.
-	if t.bearerToken != "" {
-		bearerTokenString := "Bearer " + t.bearerToken
-		req.Header.Set("Authorization", bearerTokenString)
-	}
-
-	return nil
+	return &client, nil
 }
 
 // buildTLSConfig uses the TLSConfig map in Config to create a tls.Config struct.
@@ -218,4 +199,13 @@ func (e *Exporter) loadClientCertificate(tlsConfig *tls.Config) error {
 	}
 	tlsConfig.Certificates = []tls.Certificate{cert}
 	return nil
+}
+
+// storeAuthHeader creates a new Headers map in the Config if it is nil and stores the
+// Authorization header value in the map.
+func (e *Exporter) storeAuthHeader(value string) {
+	if e.config.Headers == nil {
+		e.config.Headers = make(map[string]string)
+	}
+	e.config.Headers["Authorization"] = value
 }
