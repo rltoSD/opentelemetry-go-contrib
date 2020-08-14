@@ -137,6 +137,18 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			}
 
 			timeSeries = append(timeSeries, tSeries...)
+
+			// if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
+			// 	summary := make([]quantile, len(e.config.Quantiles))
+
+			// 	for i, q := range e.config.Quantiles {
+			// 		value, err := distribution.Quantile(q)
+			// 		if err != nil {
+			// 			return err
+			// 		}
+			// 		fmt.Printf("%d", value)
+			// 	}
+			// }
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -145,6 +157,8 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 			timeSeries = append(timeSeries, tSeries)
 		}
+
+		// TODO: Log a warning when no conversion takes place
 
 		return nil
 	})
@@ -232,6 +246,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	// Count returns an int, not a metric.Number so we aren't using the createTimeSeries
+	// TODO: Refactor createTimeSeries to accept metric.Number and an int
 	name = sanitize(record.Descriptor().Name() + "_count")
 	labels := createLabelSet(record, "__name__", name)
 
