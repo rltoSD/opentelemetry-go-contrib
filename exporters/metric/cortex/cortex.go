@@ -47,7 +47,7 @@ func (e *Exporter) ExportKindFor(*apimetric.Descriptor, aggregation.Kind) metric
 
 // Export forwards metrics to Cortex from the SDK
 func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet) error {
-	fmt.Println("Export Called")
+	fmt.Printf("Export called!\n\n")
 	timeseries, err := e.ConvertToTimeSeries(checkpointSet)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 	name := sanitize(record.Descriptor().Name())
 	tSeries := createTimeSeries(record, value, "__name__", name)
 
-	fmt.Printf("TimeSeries: %+v", tSeries)
+	// fmt.Printf("TimeSeries: %+v\n\n", tSeries)
 
 	return tSeries, nil
 }
