@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
@@ -162,7 +163,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 func createTimeSeries(record metric.Record, value apimetric.Number, extraLabels ...string) *prompb.TimeSeries {
 	sample := prompb.Sample{
 		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().Unix(),
+		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
 	}
 
 	labels := createLabelSet(record, extraLabels...)
@@ -230,7 +231,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	}
 	countSample := prompb.Sample{
 		Value:     float64(count),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
+		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond), // Convert time to Unix (int64),
 	}
 
 	// Create labels, including metric name
