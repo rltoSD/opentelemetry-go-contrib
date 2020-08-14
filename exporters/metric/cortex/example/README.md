@@ -14,9 +14,15 @@ This example exports several metrics to a Cortex instance.
 docker-compose up -d
 ```
 
-2. View metrics in the Cortex instance running at `localhost:XXXX`
+2. Log into the Grafana instance running at `http://localhost:3000`. The login credentials are
+   admin/admin.
 
-3. Shut down the services when you're finished with the example
+3. Add Cortex as a data source by creating a new Prometheus data source is using
+   `http://localhost:9009/api/prom/` as the endpoint.
+
+4. View collected metrics in Grafana.
+
+5. Shut down the services when you're finished with the example
 
 ```bash
 docker-compose down
