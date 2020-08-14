@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -166,4 +167,38 @@ func createFile(bytes []byte, filepath string) error {
 		return err
 	}
 	return nil
+}
+
+// TestBuildClient checks whether the client returned by buildClient works with TLS and
+// has the correct timeout and proxy.
+func TestBuildClient(t *testing.T) {
+	tests := []struct {
+		testName              string
+		remoteTimeout         time.Duration
+		expectedRemoteTimeout time.Duration
+		expectedError         error
+	}{
+		{
+			testName:              "Timeout of 10s",
+			remoteTimeout:         10 * time.Second,
+			expectedRemoteTimeout: 10 * time.Second,
+			expectedError:         nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			exporter := Exporter{
+				Config{
+					RemoteTimeout: test.remoteTimeout,
+				},
+			}
+			client, err := exporter.buildClient()
+			if err != nil {
+				require.Equal(t, err.Error(), test.expectedError.Error())
+			} else {
+				require.Nil(t, err)
+			}
+			require.Equal(t, client.Timeout, test.expectedRemoteTimeout)
+		})
+	}
 }
