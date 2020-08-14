@@ -1,3 +1,17 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cortex
 
 import (
@@ -6,18 +20,22 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/prometheus/prompb"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/sdk/export/metric"
+	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
+	"go.opentelemetry.io/otel/sdk/resource"
 )
 
 // ValidConfig is a Config struct that should cause no errors.
@@ -47,6 +65,9 @@ var validConfig = Config{
 	Client: http.DefaultClient,
 }
 
+var testResource = resource.New(kv.String("R", "V"))
+var mockTime int64 = time.Time{}.Unix()
+
 func TestExportKindFor(t *testing.T) {
 	exporter := Exporter{}
 	got := exporter.ExportKindFor(nil, aggregation.Kind(0))
@@ -57,8 +78,173 @@ func TestExportKindFor(t *testing.T) {
 	}
 }
 
-// TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with the same
-// Config struct as the one passed in.
+func TestConvertToTimeSeries(t *testing.T) {
+	// Setup
+	exporter := Exporter{}
+
+	// Test conversions based on aggregation type
+	tests := []struct {
+		name       string
+		input      export.CheckpointSet
+		want       []*prompb.TimeSeries
+		wantLength int
+	}{
+		{
+			name:  "validCheckpointSet",
+			input: getValidCheckpointSet(t),
+			want: []*prompb.TimeSeries{
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "__name__",
+							Value: "metric_name",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     321,
+						Timestamp: mockTime,
+					}},
+				},
+			},
+			wantLength: 1,
+		},
+		{
+			name:  "convertFromSum",
+			input: getSumCheckpoint(t, 321),
+			want: []*prompb.TimeSeries{
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "__name__",
+							Value: "metric_name",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     321,
+						Timestamp: mockTime,
+					}},
+				},
+			},
+			wantLength: 1,
+		},
+		{
+			name:  "convertFromLastValue",
+			input: getLastValueCheckpoint(t, 123),
+			want: []*prompb.TimeSeries{
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "__name__",
+							Value: "metric_name",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     123,
+						Timestamp: mockTime,
+					}},
+				},
+			},
+			wantLength: 1,
+		},
+		{
+			name:  "convertFromMinMaxSumCount",
+			input: getMMSCCheckpoint(t, 123.456, 876.543),
+			want: []*prompb.TimeSeries{
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "__name__",
+							Value: "metric_name",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     999.999,
+						Timestamp: mockTime,
+					}},
+				},
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "__name__",
+							Value: "metric_name_min",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     123.456,
+						Timestamp: mockTime,
+					}},
+				},
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "__name__",
+							Value: "metric_name_max",
+						},
+						{
+							Name:  "R",
+							Value: "V",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     876.543,
+						Timestamp: mockTime,
+					}},
+				},
+				{
+					Labels: []*prompb.Label{
+						{
+							Name:  "R",
+							Value: "V",
+						},
+						{
+							Name:  "__name__",
+							Value: "metric_name_count",
+						},
+					},
+					Samples: []prompb.Sample{{
+						Value:     2,
+						Timestamp: mockTime,
+					}},
+				},
+			},
+			wantLength: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := exporter.ConvertToTimeSeries(tt.input)
+			want := tt.want
+
+			assert.Nil(t, err, "ConvertToTimeSeries error")
+			assert.Len(t, got, tt.wantLength, "Incorrect number of timeseries")
+			cmp.Equal(got, want)
+		})
+	}
+}
+
+// TestNewRawExporter tests whether NewRawExporter successfully creates an Exporter with
+// the same Config struct as the one passed in.
 func TestNewRawExporter(t *testing.T) {
 	exporter, err := NewRawExporter(validConfig)
 	if err != nil {
@@ -70,9 +256,9 @@ func TestNewRawExporter(t *testing.T) {
 	}
 }
 
-// TestNewExportPipeline tests whether a push Controller was successfully created with an Exporter
-// from New RawExporter. Errors in this function will be from calls to push controller package and
-// NewRawExport. Both have their own tests.
+// TestNewExportPipeline tests whether a push Controller was successfully created with an
+// Exporter from NewRawExporter. Errors in this function will be from calls to push
+// controller package and NewRawExport. Both have their own tests.
 func TestNewExportPipeline(t *testing.T) {
 	_, err := NewExportPipeline(validConfig)
 	if err != nil {
@@ -80,8 +266,8 @@ func TestNewExportPipeline(t *testing.T) {
 	}
 }
 
-// TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push Controller
-// and whether that controller's Provider is registered globally.
+// TestInstallNewPipeline checks whether InstallNewPipeline successfully returns a push
+// Controller and whether that controller's Provider is registered globally.
 func TestInstallNewPipeline(t *testing.T) {
 	pusher, err := InstallNewPipeline(validConfig)
 	if err != nil {
@@ -92,13 +278,12 @@ func TestInstallNewPipeline(t *testing.T) {
 	}
 }
 
-// TestAddHeaders tests whether the correct headers are correctly added to an http request.
+// TestAddHeaders tests whether the correct headers are correctly added to a http request.
 func TestAddHeaders(t *testing.T) {
-	// Make a fake Config struct and Exporter for testing.
 	testConfig := Config{
 		Headers: map[string]string{
-			"testHeader":    "testField",
-			"TestHeaderTwo": "testFieldTwo",
+			"TestHeaderOne": "TestFieldTwo",
+			"TestHeaderTwo": "TestFieldTwo",
 		},
 	}
 	exporter := Exporter{testConfig}
@@ -110,19 +295,31 @@ func TestAddHeaders(t *testing.T) {
 
 	// Check that all the headers are there.
 	for name, field := range testConfig.Headers {
-		// Headers are case-insensitive; Viper converts all keys to lower-case.
-		lowercaseName := strings.ToLower(name)
-		require.Equal(t, req.Header.Get(lowercaseName), field)
+		require.Equal(t, req.Header.Get(name), field)
 	}
 	require.Equal(t, req.Header.Get("Content-Encoding"), "snappy")
 	require.Equal(t, req.Header.Get("Content-Type"), "application/x-protobuf")
+	require.Equal(t, req.Header.Get("X-Prometheus-Remote-Write-Version"), "0.1.0")
 }
 
-// TestBuildRequest tests whether a http request is a POST request, has the correct body, and has
-// the correct headers.
+// TestBuildMessage tests whether BuildMessage successfully returns a Snappy-compressed
+// protobuf message.
+func TestBuildMessage(t *testing.T) {
+	exporter := Exporter{validConfig}
+	timeseries := []*prompb.TimeSeries{}
+
+	// buildMessage returns the error that proto.Marshal() returns. Since the proto
+	// package has its own tests, buildMessage should work as expected as long as there
+	// are no errors.
+	_, err := exporter.buildMessage(timeseries)
+	require.Nil(t, err)
+}
+
+// TestBuildRequest tests whether a http request is a POST request, has the correct body,
+// and has the correct headers.
 func TestBuildRequest(t *testing.T) {
 	// Make fake exporter and message for testing.
-	var testMessage = []byte(`Test Message!`)
+	var testMessage = []byte(`Test Message`)
 	exporter := Exporter{validConfig}
 
 	// Create the http request.
@@ -139,74 +336,72 @@ func TestBuildRequest(t *testing.T) {
 
 	// Verify headers.
 	for name, field := range exporter.config.Headers {
-		// Headers are case-insensitive; Viper converts all keys to lower-case.
-		lowercaseName := strings.ToLower(name)
-		require.Equal(t, req.Header.Get(lowercaseName), field)
+		require.Equal(t, req.Header.Get(name), field)
 	}
 	require.Equal(t, req.Header.Get("Content-Encoding"), "snappy")
 	require.Equal(t, req.Header.Get("Content-Type"), "application/x-protobuf")
+	require.Equal(t, req.Header.Get("X-Prometheus-Remote-Write-Version"), "0.1.0")
 }
 
-// TestBuildMessage tests whether BuildMessage successfully returns a Snappy-compressed protobuf
-// message.
-func TestBuildMessage(t *testing.T) {
-	exporter := Exporter{validConfig}
-	timeseries := []*prompb.TimeSeries{}
+// verifyExporterRequest checks a HTTP request from the export pipeline. It checks whether
+// the request contains a correctly formatted remote_write body and the required headers.
+func verifyExporterRequest(req *http.Request) error {
+	// Check for required headers.
+	if req.Header.Get("X-Prometheus-Remote-Write-Version") != "0.1.0" ||
+		req.Header.Get("Content-Encoding") != "snappy" ||
+		req.Header.Get("Content-Type") != "application/x-protobuf" {
+		return fmt.Errorf("Request does not contain the three required headers")
+	}
 
-	// BuildMessage simply calls protobuf.Marshal() and snappy.Encode(). BuildMessage returns the
-	// error returned by these two functions, which have their own tests in their respective
-	// packages. As long as no error is returned, the function should work as expected.
-	_, err := exporter.buildMessage(timeseries)
-	require.Nil(t, err)
+	// Check body format and headers.
+	compressed, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return fmt.Errorf("Failed to read request body")
+	}
+	uncompressed, err := snappy.Decode(nil, compressed)
+	if err != nil {
+		return fmt.Errorf("Failed to uncompress request body")
+	}
+	wr := &prompb.WriteRequest{}
+	err = proto.Unmarshal(uncompressed, wr)
+	if err != nil {
+		return fmt.Errorf("Failed to unmarshal message into WriteRequest struct")
+	}
+
+	return nil
 }
 
-// TestSendRequest tests if the Exporter can successfully send a http request with a correctly
-// formatted request and the correct headers. A test server returns status codes to test if the
-// Exporter responds to send failure correctly.
+// TestSendRequest checks if the Exporter can successfully send a http request with a
+// correctly formatted body and the correct headers. A test server returns different
+// status codes to test if the Exporter responds to a send failure correctly.
 func TestSendRequest(t *testing.T) {
 	tests := []struct {
-		name               string
-		expectedStatusCode int
-		expectedError      error
-		isStatusNotFound   bool
+		testName         string
+		config           *Config
+		expectedError    error
+		isStatusNotFound bool
 	}{
 		{
-			"Successful Export",
-			200,
-			nil,
-			false,
+			testName:         "Successful Export",
+			config:           &validConfig,
+			expectedError:    nil,
+			isStatusNotFound: false,
 		},
 		{
-			"Export Failure",
-			404,
-			fmt.Errorf("Failed to send the HTTP request with status code %v", 404),
-			true,
+			testName:         "Export Failure",
+			config:           &Config{},
+			expectedError:    fmt.Errorf("%v", "404 Not Found"),
+			isStatusNotFound: true,
 		},
 	}
 
-	// Set up a test server to receive data.
+	// Set up a test server to receive the request. The server responds with a 400 Bad
+	// Request status code if any headers are missing or if the body is not of the correct
+	// format. Additionally, the server can respond with status code 404 Not Found to
+	// simulate send failures.
 	handler := func(rw http.ResponseWriter, req *http.Request) {
-		// Check the request body and make sure it was formatted correctly and has the correct
-		// headers.
-		compressed, err := ioutil.ReadAll(req.Body)
+		err := verifyExporterRequest(req)
 		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		uncompressed, err := snappy.Decode(nil, compressed)
-		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		wr := &prompb.WriteRequest{}
-		err = proto.Unmarshal(uncompressed, wr)
-		if err != nil {
-			rw.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if req.Header.Get("X-Prometheus-Remote-Write-Version") != "0.1.0" ||
-			req.Header.Get("Content-Encoding") != "snappy" ||
-			req.Header.Get("Content-Type") != "application/x-protobuf" {
 			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -222,15 +417,14 @@ func TestSendRequest(t *testing.T) {
 	defer server.Close()
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Set up an Exporter that uses the test server's endpoint and attaches the test's
-			// serverFailure header.
-			customConfig := validConfig
-			customConfig.Endpoint = server.URL
-			customConfig.Headers = map[string]string{
+		t.Run(test.testName, func(t *testing.T) {
+			// Set up an Exporter that uses the test server's endpoint and attaches the
+			// test's isStatusNotFound header.
+			test.config.Endpoint = server.URL
+			test.config.Headers = map[string]string{
 				"isStatusNotFound": strconv.FormatBool(test.isStatusNotFound),
 			}
-			exporter := Exporter{customConfig}
+			exporter := Exporter{*test.config}
 
 			// Create an empty Snappy-compressed message.
 			msg, err := exporter.buildMessage([]*prompb.TimeSeries{})
@@ -240,25 +434,14 @@ func TestSendRequest(t *testing.T) {
 			req, err := exporter.buildRequest(msg)
 			require.Nil(t, err)
 
-			// Send the request to the test server and verify errors and status codes.
+			// Send the request to the test server and verify the error.
 			err = exporter.sendRequest(req)
-			var statusCode int
-			var errString string
 			if err != nil {
-				errString = err.Error()
-
-				// Retrieve status code from error string.
-				split := strings.Split(errString, " ")
-				statusCode, err = strconv.Atoi(split[len(split)-1])
-				require.Nil(t, err)
-
-				// Verify errors.
-				require.Equal(t, errString, test.expectedError.Error())
+				errorString := err.Error()
+				require.Equal(t, errorString, test.expectedError.Error())
 			} else {
-				statusCode = 200
-				require.Equal(t, nil, test.expectedError)
+				require.Nil(t, test.expectedError)
 			}
-			require.Equal(t, statusCode, test.expectedStatusCode)
 		})
 	}
 }
