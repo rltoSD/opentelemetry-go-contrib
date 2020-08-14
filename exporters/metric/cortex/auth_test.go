@@ -14,10 +14,21 @@
 package cortex
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/pem"
+	"fmt"
 	"io/ioutil"
+	"log"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"os"
 	"testing"
 	"time"
@@ -173,32 +184,144 @@ func createFile(bytes []byte, filepath string) error {
 // has the correct timeout and proxy.
 func TestBuildClient(t *testing.T) {
 	tests := []struct {
-		testName              string
-		remoteTimeout         time.Duration
-		expectedRemoteTimeout time.Duration
-		expectedError         error
-	}{
-		{
-			testName:              "Timeout of 10s",
-			remoteTimeout:         10 * time.Second,
-			expectedRemoteTimeout: 10 * time.Second,
-			expectedError:         nil,
-		},
-	}
+		testName string
+	}{}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
+			// Server
+			handler := func(rw http.ResponseWriter, req *http.Request) {
+				rw.Write([]byte("test"))
+			}
+			server := httptest.NewUnstartedServer(http.HandlerFunc(handler))
+
+			// Generate tls config
+			generateCACertFiles()
+			defer os.Remove("./ca.pem")
+			defer os.Remove("./ca_key.pem")
+
+			generateSelfSignedCertFiles()
+			defer os.Remove("./cert.pem")
+			defer os.Remove("./key.pem")
+
+			tlsCert, err := tls.LoadX509KeyPair("./ca.pem", "./ca_key.pem")
+			require.Nil(t, err)
+
+			// Set server TLS and start server
+			server.TLS = &tls.Config{
+				Certificates: []tls.Certificate{tlsCert},
+			}
+			server.StartTLS()
+			defer server.Close()
+
 			exporter := Exporter{
 				Config{
-					RemoteTimeout: test.remoteTimeout,
+					TLSConfig: map[string]string{
+						"ca_file":              "./ca.pem",
+						"cert_file":            "./cert.pem",
+						"key_file":             "./key.pem",
+						"insecure_skip_verify": "1",
+					},
 				},
 			}
 			client, err := exporter.buildClient()
+			require.Nil(t, err)
+			res, err := client.Get(server.URL)
 			if err != nil {
-				require.Equal(t, err.Error(), test.expectedError.Error())
-			} else {
-				require.Nil(t, err)
+				log.Fatalf("could not make GET request: %v", err)
 			}
-			require.Equal(t, client.Timeout, test.expectedRemoteTimeout)
+			dump, err := httputil.DumpResponse(res, true)
+			if err != nil {
+				log.Fatalf("could not dump response: %v", err)
+			}
+			fmt.Printf("%s\n", dump)
+
 		})
 	}
+}
+
+func generateCACertFiles() error {
+	caCertTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(123),
+		Subject: pkix.Name{
+			Organization: []string{"CA Certificate"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(5 * time.Minute),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign,
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	// Generate a key for the new CA certificate.
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return err
+	}
+
+	// Create the certificate with the parent certificate as the template.
+	caCertBytes, err := x509.CreateCertificate(
+		rand.Reader, &caCertTemplate, &caCertTemplate, &privKey.PublicKey, privKey,
+	)
+	if err != nil {
+		return err
+	}
+
+	caCertPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caCertBytes,
+	})
+	createFile(caCertPEM, "./ca.pem")
+
+	privKeyBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privKeyBytes,
+	})
+	createFile(privKeyPEM, "./ca_key.pem")
+	return nil
+}
+
+func generateSelfSignedCertFiles() error {
+	ssCertTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(123),
+		Subject: pkix.Name{
+			Organization: []string{"CA Certificate"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(5 * time.Minute),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	// Generate a key for the new CA certificate.
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return err
+	}
+
+	ssCertBytes, err := x509.CreateCertificate(
+		rand.Reader, &ssCertTemplate, &ssCertTemplate, &privKey.PublicKey, privKey,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Write certificate to cert.pem.
+	ssCertPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: ssCertBytes,
+	})
+	createFile(ssCertPEM, "./cert.pem")
+
+	// Write key to key.pem.
+	privKeyBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privKeyBytes,
+	})
+	createFile(privKeyPEM, "./key.pem")
+	return nil
 }

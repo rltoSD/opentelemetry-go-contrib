@@ -122,20 +122,24 @@ func (e *Exporter) buildClient() (*http.Client, error) {
 		return nil, err
 	}
 
-	// Convert proxy url to proxy function for use in custom Transport.
-	proxyURL, err := url.Parse(e.config.ProxyURL)
-	if err != nil {
-		return nil, err
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
 	}
-	proxy := http.ProxyURL(proxyURL)
+
+	// Convert proxy url to proxy function for use in custom Transport.
+	if e.config.ProxyURL != "" {
+		proxyURL, err := url.Parse(e.config.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+		proxy := http.ProxyURL(proxyURL)
+		transport.Proxy = proxy
+	}
 
 	// Create and return a client that
 	client := http.Client{
-		Transport: &http.Transport{
-			Proxy:           proxy,
-			TLSClientConfig: tlsConfig,
-		},
-		Timeout: e.config.RemoteTimeout,
+		Transport: transport,
+		Timeout:   e.config.RemoteTimeout,
 	}
 	return &client, nil
 }
