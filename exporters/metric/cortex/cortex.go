@@ -48,7 +48,6 @@ func (e *Exporter) ExportKindFor(*apimetric.Descriptor, aggregation.Kind) metric
 
 // Export forwards metrics to Cortex from the SDK
 func (e *Exporter) Export(_ context.Context, checkpointSet metric.CheckpointSet) error {
-	fmt.Printf("Export called!\n\n")
 	timeseries, err := e.ConvertToTimeSeries(checkpointSet)
 	if err != nil {
 		return err
@@ -161,6 +160,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 // createTimeSeries is a helper function to create a timeseries from a value and labels
 func createTimeSeries(record metric.Record, value apimetric.Number, extraLabels ...string) *prompb.TimeSeries {
+	// Cortex expects timestamps in milliseconds.
 	sample := prompb.Sample{
 		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
 		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
@@ -185,8 +185,6 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 	// Create TimeSeries
 	name := sanitize(record.Descriptor().Name())
 	tSeries := createTimeSeries(record, value, "__name__", name)
-
-	// fmt.Printf("TimeSeries: %+v\n\n", tSeries)
 
 	return tSeries, nil
 }
