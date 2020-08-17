@@ -206,6 +206,8 @@ func convertFromSum(record metric.Record, sum aggregation.Sum) (*prompb.TimeSeri
 
 	// Create TimeSeries
 	name := sanitize(record.Descriptor().Name())
+	// Note: Cortex requires the name label to be in the format "__name__".
+	// This is the case for all time series created by this exporter.
 	tSeries := createTimeSeries(record, value, "__name__", name)
 
 	return tSeries, nil

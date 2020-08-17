@@ -28,8 +28,8 @@ Exporter during the setup pipeline.
 ### Creating the Config struct
 
 Users can either create the struct manually or use a `utils` submodule in the package to read
-settings from a YAML file into a new Config struct using `Viper`. Here are the supported YAML
-properties as well as the Config struct that they map to.
+settings from a YAML file into a new Config struct using [Viper](https://github.com/spf13/viper).
+Here are the supported YAML properties as well as the Config struct that they map to.
 
 ```yaml
 # The URL of the endpoint to send samples to.
