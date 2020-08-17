@@ -167,7 +167,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			timeSeries = append(timeSeries, tSeries)
 		} else {
 			// Report to the user when no conversion was found
-			log.Printf("No conversion found for record: %s\n", record.Descriptor().Name())
+			fmt.Printf("No conversion found for record: %s\n", record.Descriptor().Name())
 		}
 
 		return nil
@@ -257,7 +257,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 
 	// Create labels, including metric name
 	name = sanitize(record.Descriptor().Name() + "_count")
-	labels := createLabelSet(record, "name", name)
+	labels := createLabelSet(record, "__name__", name)
 
 	// Create TimeSeries
 	countTimeSeries := &prompb.TimeSeries{
