@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
@@ -110,6 +111,8 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 }
 
 // ConvertToTimeSeries converts a CheckpointSet to a slice of TimeSeries pointers
+// Based on the aggregation type, ConvertToTimeSeries will call helper function like
+// convertFromSum to generate the correct number of TimeSeries.
 func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*prompb.TimeSeries, error) {
 	var aggError error
 	var timeSeries []*prompb.TimeSeries
@@ -138,17 +141,15 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 
 			timeSeries = append(timeSeries, tSeries...)
 
-			// if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
-			// 	summary := make([]quantile, len(e.config.Quantiles))
+			// Check if aggregation has a Distribution value
+			if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
+				tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
+				if err != nil {
+					return err
+				}
 
-			// 	for i, q := range e.config.Quantiles {
-			// 		value, err := distribution.Quantile(q)
-			// 		if err != nil {
-			// 			return err
-			// 		}
-			// 		fmt.Printf("%d", value)
-			// 	}
-			// }
+				timeSeries = append(timeSeries, tSeries...)
+			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -261,6 +262,29 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	}
 
 	return tSeries, nil
+}
+
+// convertFromDistribution returns n TimeSeries for n quantiles in a distriubtion
+func convertFromDistribution(record metric.Record, distribution aggregation.Distribution, quantiles []float64) ([]*prompb.TimeSeries, error) {
+	var timeSeries []*prompb.TimeSeries
+	metricName := sanitize(record.Descriptor().Name())
+
+	// For each configured quantile, get the value and create a timeseries
+	for _, q := range quantiles {
+		value, err := distribution.Quantile(q)
+		if err != nil {
+			return nil, err
+		}
+
+		// Add quantile as a label. e.g. {quantile="0.5"}
+		quantileStr := strconv.FormatFloat(q, 'f', -1, 64)
+
+		// Create TimeSeries
+		tSeries := createTimeSeries(record, value, "__name__", metricName, "quantile", quantileStr)
+		timeSeries = append(timeSeries, tSeries)
+	}
+
+	return timeSeries, nil
 }
 
 // createLabelSet combines labels from a Record, resource, and extra labels to
