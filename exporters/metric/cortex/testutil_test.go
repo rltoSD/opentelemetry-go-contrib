@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // Copyright The OpenTelemetry Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+=======
+>>>>>>> a18354ba7b6c71270d089b88d55584c4e9a72949
 package cortex
 
 import (
@@ -19,18 +22,62 @@ import (
 
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/stretchr/testify/require"
+<<<<<<< HEAD
 
+=======
+>>>>>>> a18354ba7b6c71270d089b88d55584c4e9a72949
 	"go.opentelemetry.io/otel/api/metric"
 	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/metrictest"
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/aggregatortest"
+<<<<<<< HEAD
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/array"
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/histogram"
+=======
+>>>>>>> a18354ba7b6c71270d089b88d55584c4e9a72949
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/lastvalue"
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/minmaxsumcount"
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/sum"
 )
 
+<<<<<<< HEAD
+=======
+// getLabels returns labels from pairs of strings
+func getLabels(labels ...string) []prompb.Label {
+	pbLabels := prompb.Labels{
+		Labels: []prompb.Label{},
+	}
+	for i := 0; i < len(labels); i += 2 {
+		pbLabels.Labels = append(pbLabels.Labels, *getLabel(labels[i], labels[i+1]))
+	}
+	return pbLabels.Labels
+}
+
+// getLabel returns a Label given a name and value
+func getLabel(name string, value string) *prompb.Label {
+	return &prompb.Label{
+		Name:  name,
+		Value: value,
+	}
+}
+
+// getSample returns a sample given a value and timestamp
+func getSample(value float64, timestamp int64) prompb.Sample {
+	return prompb.Sample{
+		Value:     value,
+		Timestamp: timestamp,
+	}
+}
+
+// getTimeSeries returns a timeseries containing labels and samples
+func getTimeSeries(labels []*prompb.Label, samples ...prompb.Sample) *prompb.TimeSeries {
+	return &prompb.TimeSeries{
+		Labels:  labels,
+		Samples: samples,
+	}
+}
+
+>>>>>>> a18354ba7b6c71270d089b88d55584c4e9a72949
 // getValidCheckpointSet returns a valid checkpointset with several records
 func getValidCheckpointSet(t *testing.T) export.CheckpointSet {
 	return getSumCheckpoint(t, 321)
