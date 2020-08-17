@@ -123,6 +123,12 @@ func TestConvertToTimeSeries(t *testing.T) {
 			want:       wantDistributionCheckpointSet,
 			wantLength: 7,
 		},
+		{
+			name:       "convertFromHistogram",
+			input:      getHistogramCheckpoint(t),
+			want:       wantHistogramCheckpointSet,
+			wantLength: 6,
+		},
 	}
 
 	for _, tt := range tests {

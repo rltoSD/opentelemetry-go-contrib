@@ -92,7 +92,7 @@ func NewExportPipeline(config Config, options ...push.Option) (*push.Controller,
 	}
 
 	pusher := push.New(
-		simple.NewWithExactDistribution(),
+		simple.NewWithHistogramDistribution(config.HistogramBoundaries),
 		exporter,
 		options...,
 	)
@@ -122,34 +122,42 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 		// Convert based on aggregation type
 		agg := record.Aggregation()
 
-		// Check if aggregation has Sum value
-		if sum, ok := agg.(aggregation.Sum); ok {
+		// Check if aggregation has Histogram value
+		if histogram, ok := agg.(aggregation.Histogram); ok {
+			tSeries, err := convertFromHistogram(record, histogram)
+			if err != nil {
+				return err
+			}
+			timeSeries = append(timeSeries, tSeries...)
+			// Check if aggregation has sum value
+		} else if sum, ok := agg.(aggregation.Sum); ok {
 			tSeries, err := convertFromSum(record, sum)
 			if err != nil {
 				return err
 			}
 
 			timeSeries = append(timeSeries, tSeries)
-		}
 
-		// Check if aggregation has MinMaxSumCount value
-		if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
-			tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
-			if err != nil {
-				return err
-			}
-
-			timeSeries = append(timeSeries, tSeries...)
-
-			// Check if aggregation has a Distribution value
-			if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
-				tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
+			// Check if aggregation has MinMaxSumCount value
+			if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
+				tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
 				if err != nil {
 					return err
 				}
 
 				timeSeries = append(timeSeries, tSeries...)
+
+				// Check if aggregation has a Distribution value
+				if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
+					tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
+					if err != nil {
+						return err
+					}
+
+					timeSeries = append(timeSeries, tSeries...)
+				}
 			}
+			// Check if aggregation has lastValue
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -157,9 +165,10 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			}
 
 			timeSeries = append(timeSeries, tSeries)
+		} else {
+			// Report to the user when no conversion was found
+			log.Printf("No conversion found for record: %s\n", record.Descriptor().Name())
 		}
-
-		// TODO: Log a warning when no conversion takes place
 
 		return nil
 	})
@@ -236,6 +245,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	maxTimeSeries := createTimeSeries(record, max, "__name__", name)
 
 	// Convert Count
+	// TODO: Refactor this to use createTimeSeries helper function
 	count, err := minMaxSumCount.Count()
 	if err != nil {
 		return nil, err
@@ -246,10 +256,8 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	}
 
 	// Create labels, including metric name
-	// Count returns an int, not a metric.Number so we aren't using the createTimeSeries
-	// TODO: Refactor createTimeSeries to accept metric.Number and an int
 	name = sanitize(record.Descriptor().Name() + "_count")
-	labels := createLabelSet(record, "__name__", name)
+	labels := createLabelSet(record, "name", name)
 
 	// Create TimeSeries
 	countTimeSeries := &prompb.TimeSeries{
@@ -257,6 +265,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 		Labels:  labels,
 	}
 
+	// Return all timeSeries
 	tSeries := []*prompb.TimeSeries{
 		minTimeSeries, maxTimeSeries, countTimeSeries,
 	}
@@ -264,7 +273,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	return tSeries, nil
 }
 
-// convertFromDistribution returns n TimeSeries for n quantiles in a distriubtion
+// convertFromDistribution returns n TimeSeries for n quantiles in a distributions
 func convertFromDistribution(record metric.Record, distribution aggregation.Distribution, quantiles []float64) ([]*prompb.TimeSeries, error) {
 	var timeSeries []*prompb.TimeSeries
 	metricName := sanitize(record.Descriptor().Name())
@@ -283,6 +292,56 @@ func convertFromDistribution(record metric.Record, distribution aggregation.Dist
 		tSeries := createTimeSeries(record, value, "__name__", metricName, "quantile", quantileStr)
 		timeSeries = append(timeSeries, tSeries)
 	}
+
+	return timeSeries, nil
+}
+
+// convertFromHistogram returns
+func convertFromHistogram(record metric.Record, histogram aggregation.Histogram) ([]*prompb.TimeSeries, error) {
+	var timeSeries []*prompb.TimeSeries
+	metricName := sanitize(record.Descriptor().Name())
+
+	// Create Sum TimeSeries
+	sum, err := histogram.Sum()
+	if err != nil {
+		return nil, err
+	}
+	sumTimeSeries := createTimeSeries(record, sum, "__name__", metricName+"_sum")
+	timeSeries = append(timeSeries, sumTimeSeries)
+
+	// Handle Histogram buckets
+	buckets, err := histogram.Histogram()
+	if err != nil {
+		return nil, err
+	}
+
+	var totalCount float64
+	// counts maps from the bucket upper-bound to the cumulative count.
+	// The bucket with upper-bound +inf is not included.
+	counts := make(map[float64]float64, len(buckets.Boundaries))
+	for i, boundary := range buckets.Boundaries {
+		// Add bucket count to totalCount and record in map
+		totalCount += buckets.Counts[i]
+		counts[boundary] = totalCount
+
+		// Add lowerbound as a label. e.g. {le="5"}
+		boundaryStr := strconv.FormatFloat(boundary, 'f', -1, 64)
+
+		// Create timeSeries and append
+		tSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName, "le", boundaryStr)
+		timeSeries = append(timeSeries, tSeries)
+	}
+
+	// Include the +inf boundary in the total count
+	totalCount += buckets.Counts[len(buckets.Counts)-1]
+
+	// Create a timeSeries for the +inf bucket and total count
+	// These are the same and are both required by Prometheus-based backends
+	upperBoundTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName, "le", "+inf")
+	timeSeries = append(timeSeries, upperBoundTimeSeries)
+
+	countTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName+"_count")
+	timeSeries = append(timeSeries, countTimeSeries)
 
 	return timeSeries, nil
 }

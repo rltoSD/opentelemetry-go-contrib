@@ -45,8 +45,8 @@ type Config struct {
 	TLSConfig           map[string]string `mapstructure:"tls_config"`
 	ProxyURL            string            `mapstructure:"proxy_url"`
 	PushInterval        time.Duration     `mapstructure:"push_interval"`
-	Quantiles           []float64
-	HistogramBoundaries []float64
+	Quantiles           []float64         `mapstructure:"quantiles"`
+	HistogramBoundaries []float64         `mapstructure:"histogram_boundaries"`
 	Headers             map[string]string `mapstructure:"headers"`
 	Client              *http.Client
 }
