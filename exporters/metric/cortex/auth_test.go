@@ -15,6 +15,7 @@
 package cortex
 
 import (
+	"encoding/base64"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -42,7 +43,19 @@ func TestAuthentication(t *testing.T) {
 		bearerTokenFileContents       []byte
 		expectedAuthHeaderValue       string
 		expectedError                 error
-	}{}
+	}{
+		{
+			testName: "Basic Auth with password",
+			basicAuth: map[string]string{
+				"username": "TestUser",
+				"password": "TestPassword",
+			},
+			expectedAuthHeaderValue: "Basic " + base64.StdEncoding.EncodeToString(
+				[]byte("TestUser:TestPassword"),
+			),
+			expectedError: nil,
+		},
+	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
 			// Set up a test server that runs a handler function when it receives a http
