@@ -101,6 +101,19 @@ func TestAuthentication(t *testing.T) {
 			expectedAuthHeaderValue: "Bearer testToken",
 			expectedError:           nil,
 		},
+		{
+			testName:                "Bearer Token with bad bearer token file",
+			bearerTokenFile:         "missingBearerTokenFile",
+			expectedAuthHeaderValue: "",
+			expectedError:           ErrFailedToReadFile,
+		},
+		{
+			testName:                "Bearer Token with bearer token file",
+			bearerTokenFile:         "bearerTokenFile",
+			expectedAuthHeaderValue: "Bearer testToken",
+			bearerTokenFileContents: []byte("testToken"),
+			expectedError:           nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
@@ -123,6 +136,12 @@ func TestAuthentication(t *testing.T) {
 					require.Nil(t, err)
 					defer os.Remove(filepath)
 				}
+			}
+			if test.bearerTokenFile != "" && test.bearerTokenFileContents != nil {
+				filepath := "./" + test.bearerTokenFile
+				err := createFile(test.bearerTokenFileContents, filepath)
+				require.Nil(t, err)
+				defer os.Remove(filepath)
 			}
 
 			// Create a HTTP request and add headers to it through an Exporter. Since the
