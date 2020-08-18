@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,6 +58,43 @@ func TestAuthentication(t *testing.T) {
 			),
 			expectedError: nil,
 		},
+		{
+			testName: "Basic Auth with no username",
+			basicAuth: map[string]string{
+				"password": "TestPassword",
+			},
+			expectedAuthHeaderValue: "",
+			expectedError:           ErrNoBasicAuthUsername,
+		},
+		{
+			testName: "Basic Auth with no password",
+			basicAuth: map[string]string{
+				"username": "TestUser",
+			},
+			expectedAuthHeaderValue: "",
+			expectedError:           ErrNoBasicAuthPassword,
+		},
+		{
+			testName: "Basic Auth with password file",
+			basicAuth: map[string]string{
+				"username":      "TestUser",
+				"password_file": "passwordFile",
+			},
+			basicAuthPasswordFileContents: []byte("TestPassword"),
+			expectedAuthHeaderValue: "Basic " + base64.StdEncoding.EncodeToString(
+				[]byte("TestUser:TestPassword"),
+			),
+			expectedError: nil,
+		},
+		{
+			testName: "Basic Auth with bad password file",
+			basicAuth: map[string]string{
+				"username":      "TestUser",
+				"password_file": "missingPasswordFile",
+			},
+			expectedAuthHeaderValue: "",
+			expectedError:           ErrFailedToReadFile,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
@@ -69,6 +107,17 @@ func TestAuthentication(t *testing.T) {
 			}
 			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
+
+			// Create the necessary files for tests.
+			if test.basicAuth != nil {
+				passwordFile := test.basicAuth["password_file"]
+				if passwordFile != "" && test.basicAuthPasswordFileContents != nil {
+					filepath := "./" + test.basicAuth["password_file"]
+					err := createFile(test.basicAuthPasswordFileContents, filepath)
+					require.Nil(t, err)
+					defer os.Remove(filepath)
+				}
+			}
 
 			// Create a HTTP request and add headers to it through an Exporter. Since the
 			// Exporter has an empty Headers map, authentication methods will be called.
