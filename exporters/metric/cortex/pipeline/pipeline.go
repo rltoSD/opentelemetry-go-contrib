@@ -32,7 +32,7 @@ func main() {
 	defer pusher.Stop()
 
 	// Create a csv reader for reading the input data.
-	reader, err := initCSVReader("test.csv")
+	reader, err := initCSVReader("data.csv")
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
@@ -133,7 +133,7 @@ func main() {
 				},
 				metric.WithDescription("Non-additive asynchronous instrument for 64-bit integers"),
 			)
-			fmt.Printf("%v. Parsed %v\n", i, record)
+			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
 		case "fvobs", "dvobs":
 			_ = metric.Must(meter).NewFloat64ValueObserver(
 				"pipeline.float64ValueObserver",
