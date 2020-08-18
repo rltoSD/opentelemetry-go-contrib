@@ -5,9 +5,9 @@ Exporter Setup pipeline to create a new push controller that periodically calls 
 Cortex Exporter's `Export()` method. It then creates 12 instruments for each combination
 of instrument and data type -- 6 instruments x 2 data types (int64 / float64). Test data
 is read in from a generated CSV file line by line and used to add values to these
-instruments. Note that some of the lines in the CSV file will be skipped as the generated
-data contains instruments that use unsupported data types such as `short` and `double`.
-The test ends when the CSV file no longer has any lines to read. Since 
+instruments. Note that generated data contains instruments that use unsupported data types
+such as `short` and `double`. These lines will be interpreted as `int64` and `float64`
+instruments. The test ends when the CSV file no longer has any lines to read. Since 
 
 ## Input Data
 The input data is generated using a Jupyter notebook. It is a CSV file where each line

@@ -71,25 +71,25 @@ func main() {
 
 		// Record the data in the correct instrument.
 		switch data.instrument {
-		case "ictr":
+		case "ictr", "sctr":
 			int64Counter.Add(ctx, int64(val), data.keyValuePairs...)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "fctr":
+		case "fctr", "dctr":
 			float64Counter.Add(ctx, float64(val), data.keyValuePairs...)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "iudctr":
+		case "iudctr", "sudctr":
 			int64UpDownCounter.Add(ctx, int64(val), data.keyValuePairs...)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "fudctr":
+		case "fudctr", "dudctr":
 			float64UpDownCounter.Add(ctx, float64(val), data.keyValuePairs...)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "ivrec":
+		case "ivrec", "svrec":
 			int64ValueRecorder.Record(ctx, int64(val), data.keyValuePairs...)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "fvrec":
+		case "fvrec", "dvrec":
 			float64ValueRecorder.Record(ctx, float64(val), data.keyValuePairs...)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "isobs":
+		case "isobs", "ssobs":
 			_ = metric.Must(meter).NewInt64SumObserver(
 				"pipeline.int64SumObserver",
 				func(_ context.Context, result metric.Int64ObserverResult) {
@@ -98,7 +98,7 @@ func main() {
 				metric.WithDescription("Asynchronous additive monotonic instrument for 64-bit integers"),
 			)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "fsobs":
+		case "fsobs", "dsobs":
 			_ = metric.Must(meter).NewFloat64SumObserver(
 				"pipeline.float64SumObserver",
 				func(_ context.Context, result metric.Float64ObserverResult) {
@@ -107,7 +107,7 @@ func main() {
 				metric.WithDescription("Asynchronous additive monotonic instrument for 64-bit integers"),
 			)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "iudobs":
+		case "iudobs", "sudobs":
 			_ = metric.Must(meter).NewInt64UpDownSumObserver(
 				"pipeline.int64UpDownSumObserver",
 				func(_ context.Context, result metric.Int64ObserverResult) {
@@ -116,7 +116,7 @@ func main() {
 				metric.WithDescription("Asynchronous additive instrument for 64-bit integers"),
 			)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "fudobs":
+		case "fudobs", "dudobs":
 			_ = metric.Must(meter).NewFloat64UpDownSumObserver(
 				"pipeline.float64UpDownSumObserver",
 				func(_ context.Context, result metric.Float64ObserverResult) {
@@ -125,7 +125,7 @@ func main() {
 				metric.WithDescription("Asynchronous additive monotonic instrument for 64-bit integers"),
 			)
 			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
-		case "ivobs":
+		case "ivobs", "svobs":
 			_ = metric.Must(meter).NewInt64ValueObserver(
 				"pipeline.int64ValueObserver",
 				func(_ context.Context, result metric.Int64ObserverResult) {
@@ -134,7 +134,7 @@ func main() {
 				metric.WithDescription("Non-additive asynchronous instrument for 64-bit integers"),
 			)
 			fmt.Printf("%v. Parsed %v\n", i, record)
-		case "fvobs":
+		case "fvobs", "dvobs":
 			_ = metric.Must(meter).NewFloat64ValueObserver(
 				"pipeline.float64ValueObserver",
 				func(_ context.Context, result metric.Float64ObserverResult) {
