@@ -255,7 +255,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	}
 	countSample := prompb.Sample{
 		Value:     float64(count),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
+		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
 	}
 
 	// Create labels, including metric name
