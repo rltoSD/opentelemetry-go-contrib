@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // createFile writes a file with a slice of bytes at a specified filepath.
@@ -67,6 +69,28 @@ func TestAuthentication(t *testing.T) {
 			}
 			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
+
+			// Create a HTTP request and add headers to it through an Exporter. Since the
+			// Exporter has an empty Headers map, authentication methods will be called.
+			exporter := Exporter{
+				Config{
+					BasicAuth:       test.basicAuth,
+					BearerToken:     test.bearerToken,
+					BearerTokenFile: test.bearerTokenFile,
+				},
+			}
+			req, err := http.NewRequest(http.MethodPost, server.URL, nil)
+			require.Nil(t, err)
+			err = exporter.addHeaders(req)
+
+			// Verify the error and if the Authorization header was correctly set.
+			if err != nil {
+				require.Equal(t, err.Error(), test.expectedError.Error())
+			} else {
+				require.Nil(t, test.expectedError)
+				authHeaderValue := req.Header.Get("Authorization")
+				require.Equal(t, authHeaderValue, test.expectedAuthHeaderValue)
+			}
 		})
 	}
 }
