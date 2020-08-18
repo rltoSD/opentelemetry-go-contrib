@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
@@ -185,7 +186,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 func createTimeSeries(record metric.Record, value apimetric.Number, extraLabels ...string) *prompb.TimeSeries {
 	sample := prompb.Sample{
 		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().Unix(),
+		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
 	}
 
 	labels := createLabelSet(record, extraLabels...)
@@ -254,7 +255,7 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	}
 	countSample := prompb.Sample{
 		Value:     float64(count),
-		Timestamp: record.EndTime().Unix(), // Convert time to Unix (int64)
+		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
 	}
 
 	// Create labels, including metric name
@@ -396,10 +397,11 @@ func createLabelSet(record metric.Record, extras ...string) []*prompb.Label {
 	return res
 }
 
-// AddHeaders adds required headers as well as all headers in Header map to a http request.
-func (e *Exporter) addHeaders(req *http.Request) {
-	// Cortex expects Snappy-compressed protobuf messages. These two headers are hard-coded as they
-	// should be on every request.
+// addHeaders adds required headers, an Authorization header, and all headers in the
+// Config Headers map to a http request.
+func (e *Exporter) addHeaders(req *http.Request) error {
+	// Cortex expects Snappy-compressed protobuf messages. These three headers are
+	// hard-coded as they should be on every request.
 	req.Header.Add("X-Prometheus-Remote-Write-Version", "0.1.0")
 	req.Header.Add("Content-Encoding", "snappy")
 	req.Header.Set("Content-Type", "application/x-protobuf")
@@ -408,6 +410,18 @@ func (e *Exporter) addHeaders(req *http.Request) {
 	for name, field := range e.config.Headers {
 		req.Header.Add(name, field)
 	}
+
+	// Add Authorization header if it wasn't already set.
+	if _, exists := e.config.Headers["Authorization"]; !exists {
+		if err := e.addBearerTokenAuth(req); err != nil {
+			return err
+		}
+		if err := e.addBasicAuth(req); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // buildMessage creates a Snappy-compressed protobuf message from a slice of TimeSeries.
