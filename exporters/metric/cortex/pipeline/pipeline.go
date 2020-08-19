@@ -32,7 +32,7 @@ func main() {
 	defer pusher.Stop()
 
 	// Create a csv reader for reading the input data.
-	reader, err := initCSVReader("data.csv")
+	reader, err := initCSVReader("demo.csv")
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
