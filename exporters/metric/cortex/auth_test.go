@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -165,6 +166,38 @@ func TestAuthentication(t *testing.T) {
 				authHeaderValue := req.Header.Get("Authorization")
 				require.Equal(t, authHeaderValue, test.expectedAuthHeaderValue)
 			}
+		})
+	}
+}
+
+// TestBuildClient checks whether the buildClient successfully creates a client that can
+// connect over TLS and has the correct remote timeout and proxy url.
+func TestBuildClient(t *testing.T) {
+	tests := []struct {
+		testName              string
+		config                Config
+		expectedRemoteTimeout time.Duration
+		expectedErrorSuffix   string
+	}{
+		{
+			testName: "Remote Timeout with Proxy URL",
+			config: Config{
+				ProxyURL:      "123.4.5.6",
+				RemoteTimeout: 123 * time.Second,
+			},
+			expectedRemoteTimeout: 123 * time.Second,
+			expectedErrorSuffix:   "proxyconnect tcp: dial tcp :0: connect: can't assign requested address",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.testName, func(t *testing.T) {
+			// Create an Exporter client and check the timeout.
+			exporter := Exporter{
+				config: test.config,
+			}
+			client, err := exporter.buildClient()
+			require.Nil(t, err)
+			require.Equal(t, client.Timeout, test.expectedRemoteTimeout)
 		})
 	}
 }
