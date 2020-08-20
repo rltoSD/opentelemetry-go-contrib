@@ -18,11 +18,10 @@ services:
   app:
     image: golang:1.14-alpine
     volumes:
-      - .:/app
-    working_dir: /app
+      - .:/pipeline
+      - ..:/cortex/
+    working_dir: /pipeline
     command: go run pipeline.go
-    ports:
-      - 8888:8888
   cortex:
     image: quay.io/cortexproject/cortex:v1.3.0-rc.1
     command:
