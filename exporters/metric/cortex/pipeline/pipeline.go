@@ -148,7 +148,7 @@ func main() {
 		}
 
 		// Sleep for a while so the push controller won't push too much data at once.
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	// Print out elapsed time.
