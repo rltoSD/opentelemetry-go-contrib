@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -123,14 +122,27 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 		// Convert based on aggregation type
 		agg := record.Aggregation()
 
-		// Check if aggregation has Histogram value
+		// The following section uses loose type checking to determine how to
+		// convert aggregations to timeseries. More "expensive" timeseries are
+		// checked first. For example, because a Distribution has a Sum value,
+		// we must check for Distribution first or else only the Sum would be
+		// converted and the other values like Quantiles would not be.
+		//
+		// See the Aggregator Kind for more information
+		// https://github.com/open-telemetry/opentelemetry-go/blob/master/sdk/export/metric/aggregation/aggregation.go#L123-L138
 		if histogram, ok := agg.(aggregation.Histogram); ok {
 			tSeries, err := convertFromHistogram(record, histogram)
 			if err != nil {
 				return err
 			}
 			timeSeries = append(timeSeries, tSeries...)
-			// Check if aggregation has sum value
+		} else if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
+			tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
+			if err != nil {
+				return err
+			}
+
+			timeSeries = append(timeSeries, tSeries...)
 		} else if sum, ok := agg.(aggregation.Sum); ok {
 			tSeries, err := convertFromSum(record, sum)
 			if err != nil {
@@ -138,8 +150,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			}
 
 			timeSeries = append(timeSeries, tSeries)
-
-			// Check if aggregation has MinMaxSumCount value
 			if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
 				tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
 				if err != nil {
@@ -147,18 +157,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 				}
 
 				timeSeries = append(timeSeries, tSeries...)
-
-				// Check if aggregation has a Distribution value
-				if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
-					tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
-					if err != nil {
-						return err
-					}
-
-					timeSeries = append(timeSeries, tSeries...)
-				}
 			}
-			// Check if aggregation has lastValue
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
 			tSeries, err := convertFromLastValue(record, lastValue)
 			if err != nil {
@@ -276,10 +275,59 @@ func convertFromMinMaxSumCount(record metric.Record, minMaxSumCount aggregation.
 	return tSeries, nil
 }
 
-// convertFromDistribution returns n TimeSeries for n quantiles in a distributions
+// convertFromDistribution returns len(quantiles) TimeSeries and min, max, sum, count
 func convertFromDistribution(record metric.Record, distribution aggregation.Distribution, quantiles []float64) ([]*prompb.TimeSeries, error) {
 	var timeSeries []*prompb.TimeSeries
 	metricName := sanitize(record.Descriptor().Name())
+
+	// Convert Min
+	min, err := distribution.Min()
+	if err != nil {
+		return nil, err
+	}
+	name := sanitize(metricName + "_min")
+	minTimeSeries := createTimeSeries(record, min, "__name__", name)
+	timeSeries = append(timeSeries, minTimeSeries)
+
+	// Convert Max
+	max, err := distribution.Max()
+	if err != nil {
+		return nil, err
+	}
+	name = sanitize(metricName + "_max")
+	maxTimeSeries := createTimeSeries(record, max, "__name__", name)
+	timeSeries = append(timeSeries, maxTimeSeries)
+
+	// Convert Sum
+	sum, err := distribution.Sum()
+	if err != nil {
+		return nil, err
+	}
+	name = sanitize(metricName + "_sum")
+	sumTimeSeries := createTimeSeries(record, sum, "__name__", name)
+	timeSeries = append(timeSeries, sumTimeSeries)
+
+	// Convert Count
+	// TODO: Refactor this to use createTimeSeries helper function
+	count, err := distribution.Count()
+	if err != nil {
+		return nil, err
+	}
+	countSample := prompb.Sample{
+		Value:     float64(count),
+		Timestamp: int64(time.Nanosecond) * record.EndTime().UnixNano() / int64(time.Millisecond),
+	}
+
+	// Create labels, including metric name
+	name = sanitize(metricName + "_count")
+	labels := createLabelSet(record, "__name__", name)
+
+	// Create TimeSeries
+	countTimeSeries := &prompb.TimeSeries{
+		Samples: []prompb.Sample{countSample},
+		Labels:  labels,
+	}
+	timeSeries = append(timeSeries, countTimeSeries)
 
 	// For each configured quantile, get the value and create a timeseries
 	for _, q := range quantiles {
@@ -327,7 +375,7 @@ func convertFromHistogram(record metric.Record, histogram aggregation.Histogram)
 		totalCount += buckets.Counts[i]
 		counts[boundary] = totalCount
 
-		// Add lowerbound as a label. e.g. {le="5"}
+		// Add upper boundary as a label. e.g. {le="5"}
 		boundaryStr := strconv.FormatFloat(boundary, 'f', -1, 64)
 
 		// Create timeSeries and append
@@ -379,7 +427,7 @@ func createLabelSet(record metric.Record, extras ...string) []*prompb.Label {
 		// is being overwritten by a Prometheus reserved label (e.g. 'le' for histograms)
 		_, found := labelMap[extras[i]]
 		if found {
-			log.Printf("Label %s is overwritten. Check if Prometheus reserved labels are used.\n", extras[i])
+			fmt.Printf("Label %s is overwritten. Check if Prometheus reserved labels are used.\n", extras[i])
 		}
 		labelMap[extras[i]] = prompb.Label{
 			Name:  extras[i],

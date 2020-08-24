@@ -18,7 +18,8 @@ docker-compose up -d
    admin/admin.
 
 3. Add Cortex as a data source by creating a new Prometheus data source is using
-   `http://localhost:9009/api/prom/` as the endpoint.
+   `http://cortex:9009/api/prom/` as the endpoint. Because Cortex is running in a docker container,
+   we use `cortex` as the url instead of `localhost`.
 
 4. View collected metrics in Grafana.
 
