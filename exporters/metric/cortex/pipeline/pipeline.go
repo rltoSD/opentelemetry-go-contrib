@@ -20,7 +20,7 @@ import (
 )
 
 // Pipeline settings.
-var pipelineOneFilename string = "test.csv"
+var pipelineOneFilename string = "data/test.csv"
 var pipelineOneSleepPeriod time.Duration = 1 * time.Second
 
 func main() {

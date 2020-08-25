@@ -12,14 +12,27 @@
 
 # f.close()
 
-f = open("test.csv", "w")
+f = open("data/test.csv", "w")
 
 for i in range(10):
     val = i
-    f.write(f"ictr,{val},\"name1, descr1, key1, value1\"\n")
-    f.write(f"fctr,{val * 2},\"name1, descr1, key1, value1\"\n")
-    f.write(f"iudctr,{val * 3},\"name1, descr1, key1, value1\"\n")
-    f.write(f"fudctr,{val * 4},\"name1, descr1, key1, value1\"\n")
-    f.write(f"ivrec,{val * 5},\"name1, descr1, key1, value1\"\n")
-    f.write(f"fvrec,{val * 6},\"name1, descr1, key1, value1\"\n")
+    multiplier = 1 if i % 2 == 0 else -1
+
+    # f.write(f"ictr,{val},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"fctr,{val * 2},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"ivrec,{val * 3},\"name1, descr1, key1, value1\"\n")
+    f.write(f"fvrec,{val * 4},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"iudctr,{val * 5 * multiplier},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"fudctr,{val * 6 * multiplier},\"name1, descr1, key1, value1\"\n")
 f.close()
+
+# 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 = 45
+# 0 + 2 + 4 + 6 + 8 + 10 + 12 + 14 + 16 + 18 = 90
+# 0 + -1 + 2 + -3 + 4 + -5 + 6 + -7 + 8 + -9 = -5
+
+# ictr 45
+# fctr 90
+# iudctr -25
+# fudctr -30
+# ivrec 135
+# fvrec 180
