@@ -116,7 +116,6 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*prompb.TimeSeries, error) {
 	var aggError error
 	var timeSeries []*prompb.TimeSeries
-
 	// Iterate over each record in the checkpoint set and convert to TimeSeries
 	aggError = checkpointSet.ForEach(e, func(record metric.Record) error {
 		// Convert based on aggregation type
@@ -141,21 +140,18 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			if err != nil {
 				return err
 			}
-
 			timeSeries = append(timeSeries, tSeries...)
 		} else if sum, ok := agg.(aggregation.Sum); ok {
 			tSeries, err := convertFromSum(record, sum)
 			if err != nil {
 				return err
 			}
-
 			timeSeries = append(timeSeries, tSeries)
 			if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
 				tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
 				if err != nil {
 					return err
 				}
-
 				timeSeries = append(timeSeries, tSeries...)
 			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
@@ -163,13 +159,11 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			if err != nil {
 				return err
 			}
-
 			timeSeries = append(timeSeries, tSeries)
 		} else {
 			// Report to the user when no conversion was found
 			fmt.Printf("No conversion found for record: %s\n", record.Descriptor().Name())
 		}
-
 		return nil
 	})
 
