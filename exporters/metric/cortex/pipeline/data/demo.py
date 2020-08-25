@@ -14,16 +14,22 @@
 
 f = open("data/test.csv", "w")
 
-for i in range(10):
+for i in range(100):
     val = i
     multiplier = 1 if i % 2 == 0 else -1
 
     # f.write(f"ictr,{val},\"name1, descr1, key1, value1\"\n")
     # f.write(f"fctr,{val * 2},\"name1, descr1, key1, value1\"\n")
-    f.write(f"ivrec,{val * 3},\"name1, descr1, key1, value1\"\n")
-    f.write(f"fvrec,{val * 4},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"ivrec,{val * 3},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"fvrec,{val * 4},\"name1, descr1, key1, value1\"\n")
     # f.write(f"iudctr,{val * 5 * multiplier},\"name1, descr1, key1, value1\"\n")
     # f.write(f"fudctr,{val * 6 * multiplier},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"isobs,{val*7},\"name1, descr1, key1, value1\"\n")
+    f.write(f"fsobs,{val*8},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"ivobs,{val*9},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"fvobs,{val*10},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"iudobs,{val*11},\"name1, descr1, key1, value1\"\n")
+    # f.write(f"fudobs,{val*12},\"name1, descr1, key1, value1\"\n")
 f.close()
 
 # 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 = 45
@@ -36,3 +42,17 @@ f.close()
 # fudctr -30
 # ivrec 135
 # fvrec 180
+
+
+# f = open("data/test2.csv", "w")
+
+# for i in range(10):
+#     val = i
+
+#     # f.write(f"ictr,{val},\"name1, descr1, key1, value1\"\n")
+#     # f.write(f"fctr,{val * 2},\"name1, descr1, key1, value1\"\n")
+#     f.write(f"ivrec,{val * 3},\"name1, descr1, key1, value1\"\n")
+#     f.write(f"fvrec,{val * 4},\"name1, descr1, key1, value1\"\n")
+#     # f.write(f"iudctr,{val * 5 * multiplier},\"name1, descr1, key1, value1\"\n")
+#     # f.write(f"fudctr,{val * 6 * multiplier},\"name1, descr1, key1, value1\"\n")
+# f.close()

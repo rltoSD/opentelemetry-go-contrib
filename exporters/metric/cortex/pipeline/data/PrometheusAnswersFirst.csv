@@ -1,10 +1,10 @@
-counter|18|name28_ctr, descr3, {key3:value3}, {key2:value2}
-counter|36|name40_ctr, descr1, {key3:value3}
-counter|35|name47_ctr, descr2, {key3:value3}, {key1:value1}
-counter|12|name77_ctr, descr2, {key3:value3}
-counter|34|name71_ctr, descr1, {key1:value1}, {key2:value2}
-counter|28|name12_ctr, descr2, {key2:value2}
-counter|30|name61_ctr, descr2, {key2:value2}, {key1:value1}
-counter|16|name66_ctr, descr2, {key2:value2}
-counter|9|name61_ctr, descr2, {key2:value2}, {key1:value1}, {key3:value3}
-counter|23|name44_ctr, descr1, {key1:value1}, {key3:value3}
+gauge|-32.0|name0_mmsc, description0, {key0:value0}
+gauge|42.0|name5_mmsc, description5, {key5:value5}
+gauge|32.0|name8_mmsc, description8, {key8:value8}
+counter|-1|name1_ctr, description1, {key1:value1}
+counter|-45|name9_ctr, description9, {key9:value9}
+gauge|-48.0|name2_mmsc, description2, {key2:value2}
+counter|31|name3_ctr, description3, {key3:value3}
+counter|-2|name4_ctr, description4, {key4:value4}
+counter|-22|name6_ctr, description6, {key6:value6}
+gauge|-10.0|name7_mmsc, description7, {key7:value7}
