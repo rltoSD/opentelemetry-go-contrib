@@ -135,28 +135,24 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			if err != nil {
 				return err
 			}
-			fmt.Println("a")
 			timeSeries = append(timeSeries, tSeries...)
 		} else if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
 			tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
 			if err != nil {
 				return err
 			}
-			fmt.Println("b")
 			timeSeries = append(timeSeries, tSeries...)
 		} else if sum, ok := agg.(aggregation.Sum); ok {
 			tSeries, err := convertFromSum(record, sum)
 			if err != nil {
 				return err
 			}
-			fmt.Println("c")
 			timeSeries = append(timeSeries, tSeries)
 			if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
 				tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
 				if err != nil {
 					return err
 				}
-				fmt.Println("d")
 				timeSeries = append(timeSeries, tSeries...)
 			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
@@ -164,7 +160,6 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			if err != nil {
 				return err
 			}
-			fmt.Println("e")
 			timeSeries = append(timeSeries, tSeries)
 		} else {
 			// Report to the user when no conversion was found
@@ -380,7 +375,15 @@ func convertFromHistogram(record metric.Record, histogram aggregation.Histogram)
 		boundaryStr := strconv.FormatFloat(boundary, 'f', -1, 64)
 
 		// Create timeSeries and append
-		tSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName, "le", boundaryStr)
+		sample := prompb.Sample{
+			Value:     totalCount,
+			Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
+		}
+		labels := createLabelSet(record, "__name__", metricName, "le", boundaryStr)
+		tSeries := &prompb.TimeSeries{
+			Samples: []prompb.Sample{sample},
+			Labels:  labels,
+		}
 		timeSeries = append(timeSeries, tSeries)
 	}
 
@@ -389,11 +392,23 @@ func convertFromHistogram(record metric.Record, histogram aggregation.Histogram)
 
 	// Create a timeSeries for the +inf bucket and total count
 	// These are the same and are both required by Prometheus-based backends
-	upperBoundTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName, "le", "+inf")
+	sample := prompb.Sample{
+		Value:     totalCount,
+		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
+	}
+	upperBoundTimeSeries := &prompb.TimeSeries{
+		Samples: []prompb.Sample{sample},
+		Labels:  createLabelSet(record, "__name__", metricName, "le", "+inf"),
+	}
+	countTimeSeries := &prompb.TimeSeries{
+		Samples: []prompb.Sample{sample},
+		Labels:  createLabelSet(record, "__name__", metricName+"_count"),
+	}
 	timeSeries = append(timeSeries, upperBoundTimeSeries)
-
-	countTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName+"_count")
 	timeSeries = append(timeSeries, countTimeSeries)
+
+	// upperBoundTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName, "le", "+inf")
+	// countTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName+"_count")
 
 	return timeSeries, nil
 }

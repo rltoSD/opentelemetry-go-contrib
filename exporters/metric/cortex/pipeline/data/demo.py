@@ -20,7 +20,7 @@ for i in range(10):
 
     # f.write(f"ictr,{val},\"name1, descr1, key1, value1\"\n")
     # f.write(f"fctr,{val * 2},\"name1, descr1, key1, value1\"\n")
-    # f.write(f"ivrec,{val * 3},\"name1, descr1, key1, value1\"\n")
+    f.write(f"ivrec,{val * 3},\"name1, descr1, key1, value1\"\n")
     f.write(f"fvrec,{val * 4},\"name1, descr1, key1, value1\"\n")
     # f.write(f"iudctr,{val * 5 * multiplier},\"name1, descr1, key1, value1\"\n")
     # f.write(f"fudctr,{val * 6 * multiplier},\"name1, descr1, key1, value1\"\n")
