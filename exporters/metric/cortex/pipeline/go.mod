@@ -6,6 +6,8 @@ go 1.14
 replace go.opentelemetry.io/contrib/exporters/metric/cortex => ../
 
 require (
+	github.com/sergi/go-diff v1.1.0
+	github.com/tidwall/gjson v1.6.0
 	go.opentelemetry.io/contrib/exporters/metric/cortex v0.0.0-00010101000000-000000000000
 	go.opentelemetry.io/contrib/exporters/metric/cortex/utils v0.0.0-20200813041938-b948cd370862
 	go.opentelemetry.io/otel v0.10.0
