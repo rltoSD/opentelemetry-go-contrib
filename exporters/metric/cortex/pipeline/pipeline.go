@@ -21,11 +21,12 @@ import (
 
 // Pipeline settings.
 // var pipelineOneFilename string = "data/test.csv"
+
 var pipelineOneFilename string = "data/PrometheusDataFirst.csv"
 
-var pipelineOneSleepPeriod time.Duration = 1 * time.Second
+// var pipelineOneSleepPeriod time.Duration = 1 * time.Second
 
-// var pipelineOneSleepPeriod time.Duration = 50 * time.Millisecond
+var pipelineOneSleepPeriod time.Duration = 50 * time.Millisecond
 
 func main() {
 	// Start a timer to measure how long pipeline test takes.

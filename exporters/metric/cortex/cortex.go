@@ -135,24 +135,28 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			if err != nil {
 				return err
 			}
+			// fmt.Println("HISTOGRAM")
 			timeSeries = append(timeSeries, tSeries...)
 		} else if distribution, ok := agg.(aggregation.Distribution); ok && len(e.config.Quantiles) != 0 {
 			tSeries, err := convertFromDistribution(record, distribution, e.config.Quantiles)
 			if err != nil {
 				return err
 			}
+			// fmt.Println("DISTRIBUTION")
 			timeSeries = append(timeSeries, tSeries...)
 		} else if sum, ok := agg.(aggregation.Sum); ok {
 			tSeries, err := convertFromSum(record, sum)
 			if err != nil {
 				return err
 			}
+			// fmt.Println("SUM")
 			timeSeries = append(timeSeries, tSeries)
 			if minMaxSumCount, ok := agg.(aggregation.MinMaxSumCount); ok {
 				tSeries, err := convertFromMinMaxSumCount(record, minMaxSumCount)
 				if err != nil {
 					return err
 				}
+				// fmt.Println("MMSC")
 				timeSeries = append(timeSeries, tSeries...)
 			}
 		} else if lastValue, ok := agg.(aggregation.LastValue); ok {
@@ -160,6 +164,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 			if err != nil {
 				return err
 			}
+			// fmt.Println("LASTVALUE")
 			timeSeries = append(timeSeries, tSeries)
 		} else {
 			// Report to the user when no conversion was found
