@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Settings.
 var pipelineOneFilename string = "data/PrometheusDataFirst.csv"
 var pipelineOneSleepPeriod time.Duration = 0 * time.Millisecond
 var pipelineOneOutputFile string = "data/pipelineOneResults.csv"
@@ -21,6 +22,7 @@ func main() {
 	// Export to Cortex.
 	fmt.Printf("Exporting data to Cortex!\n")
 	runPipelineOne()
+	// runPipelineTwo()
 
 	// Query Cortex and write results to `pipelineOneOutputFile`.
 	fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
@@ -36,6 +38,8 @@ func main() {
 	fmt.Printf("Elapsed Time: %v\n", elapsed)
 }
 
+// validatePipelineOne opens and compares the results and answers file for pipeline one.
+// It prints whether the files are the same and removes the results file if it is.
 func validatePipelineOne() {
 	results, err := ioutil.ReadFile("data/pipelineOneResults.csv")
 	if err != nil {

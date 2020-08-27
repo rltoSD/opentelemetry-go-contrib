@@ -12,27 +12,11 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/exporters/metric/cortex"
+	"go.opentelemetry.io/contrib/exporters/metric/cortex/utils"
 	"go.opentelemetry.io/otel/api/metric"
 	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/metric/controller/push"
-
-	"go.opentelemetry.io/contrib/exporters/metric/cortex/utils"
 )
-
-// var pipelineOneSleepPeriod time.Duration = 1 * time.Second
-
-// func main() {
-// 	// Start a timer to measure how long pipeline test takes.
-// 	start := time.Now()
-// 	fmt.Printf("Starting pipeline test!\n\n")
-
-// 	runPipelineOne()
-
-// 	// Print out elapsed time.
-// 	elapsed := time.Since(start)
-// 	fmt.Printf("\n[Success] Completed pipeline test!\n")
-// 	fmt.Printf("Elapsed Time: %v\n", elapsed)
-// }
 
 // runPipelineOne runs a pipeline that records values to various instruments and exports
 // metrics data to Cortex.
@@ -238,8 +222,6 @@ func parsePipelineOneRecord(record []string) (string, string, string, string, []
 		keyValue := label.String(stringFields[i], stringFields[i+1])
 		keyValuePairs = append(keyValuePairs, keyValue)
 	}
-	// fmt.Println(record)
-	// fmt.Printf("instrument: %v, value: %v, name: %v, desc: %v, keyValuePairs: %v\n", record[0], record[1], name, desc, keyValuePairs)
 
 	return record[0], record[1], name, desc, keyValuePairs, nil
 }
