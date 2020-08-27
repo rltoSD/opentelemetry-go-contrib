@@ -27,12 +27,13 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 
 	"go.opentelemetry.io/otel/api/global"
-	"go.opentelemetry.io/otel/api/label"
 	apimetric "go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
 	"go.opentelemetry.io/otel/sdk/metric/controller/push"
+	"go.opentelemetry.io/otel/sdk/metric/processor/basic"
 	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
 )
 
@@ -92,7 +93,10 @@ func NewExportPipeline(config Config, options ...push.Option) (*push.Controller,
 	}
 
 	pusher := push.New(
-		simple.NewWithHistogramDistribution(config.HistogramBoundaries),
+		basic.New(
+			simple.NewWithHistogramDistribution(config.HistogramBoundaries),
+			exporter,
+		),
 		exporter,
 		options...,
 	)
@@ -111,7 +115,7 @@ func InstallNewPipeline(config Config, options ...push.Option) (*push.Controller
 }
 
 // ConvertToTimeSeries converts a CheckpointSet to a slice of TimeSeries pointers
-// Based on the aggregation type, ConvertToTimeSeries will call helper function like
+// Based on the aggregation type, ConvertToTimeSeries will call helper functions like
 // convertFromSum to generate the correct number of TimeSeries.
 func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*prompb.TimeSeries, error) {
 	var aggError error
@@ -186,7 +190,7 @@ func (e *Exporter) ConvertToTimeSeries(checkpointSet export.CheckpointSet) ([]*p
 func createTimeSeries(record metric.Record, value apimetric.Number, extraLabels ...string) *prompb.TimeSeries {
 	sample := prompb.Sample{
 		Value:     value.CoerceToFloat64(record.Descriptor().NumberKind()),
-		Timestamp: record.EndTime().UnixNano() / int64(time.Millisecond),
+		Timestamp: int64(time.Nanosecond) * record.EndTime().UnixNano() / int64(time.Millisecond),
 	}
 
 	labels := createLabelSet(record, extraLabels...)
@@ -412,9 +416,6 @@ func convertFromHistogram(record metric.Record, histogram aggregation.Histogram)
 	timeSeries = append(timeSeries, upperBoundTimeSeries)
 	timeSeries = append(timeSeries, countTimeSeries)
 
-	// upperBoundTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName, "le", "+inf")
-	// countTimeSeries := createTimeSeries(record, apimetric.NewFloat64Number(totalCount), "__name__", metricName+"_count")
-
 	return timeSeries, nil
 }
 
@@ -523,7 +524,10 @@ func (e *Exporter) buildRequest(message []byte) (*http.Request, error) {
 	}
 
 	// Add the required headers and the headers from Config.Headers.
-	e.addHeaders(req)
+	err = e.addHeaders(req)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }

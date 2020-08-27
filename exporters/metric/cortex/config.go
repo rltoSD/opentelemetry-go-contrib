@@ -17,21 +17,30 @@ package cortex
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
 var (
 	// ErrTwoPasswords occurs when the YAML file contains both `password` and
 	// `password_file`.
-	ErrTwoPasswords = fmt.Errorf("Cannot have two passwords in the YAML file")
+	ErrTwoPasswords = fmt.Errorf("cannot have two passwords in the YAML file")
 
 	// ErrTwoBearerTokens occurs when the YAML file contains both `bearer_token` and
 	// `bearer_token_file`.
-	ErrTwoBearerTokens = fmt.Errorf("Cannot have two bearer tokens in the YAML file")
+	ErrTwoBearerTokens = fmt.Errorf("cannot have two bearer tokens in the YAML file")
 
 	// ErrConflictingAuthorization occurs when the YAML file contains both BasicAuth and
 	// bearer token authorization
-	ErrConflictingAuthorization = fmt.Errorf("Cannot have both basic auth and bearer token authorization")
+	ErrConflictingAuthorization = fmt.Errorf("cannot have both basic auth and bearer token authorization")
+
+	// ErrNoBasicAuthUsername occurs when no username was provided for basic
+	// authentication.
+	ErrNoBasicAuthUsername = fmt.Errorf("no username provided for basic authentication")
+
+	// ErrNoBasicAuthPassword occurs when no password or password file was provided for
+	// basic authentication.
+	ErrNoBasicAuthPassword = fmt.Errorf("no password or password file provided for basic authentication")
 )
 
 // Config contains properties the Exporter uses to export metrics data to Cortex.
@@ -43,7 +52,7 @@ type Config struct {
 	BearerToken         string            `mapstructure:"bearer_token"`
 	BearerTokenFile     string            `mapstructure:"bearer_token_file"`
 	TLSConfig           map[string]string `mapstructure:"tls_config"`
-	ProxyURL            string            `mapstructure:"proxy_url"`
+	ProxyURL            *url.URL          `mapstructure:"proxy_url"`
 	PushInterval        time.Duration     `mapstructure:"push_interval"`
 	Quantiles           []float64         `mapstructure:"quantiles"`
 	HistogramBoundaries []float64         `mapstructure:"histogram_boundaries"`
@@ -54,13 +63,23 @@ type Config struct {
 // Validate checks a Config struct for missing required properties and property conflicts.
 // Additionally, it adds default values to missing properties when there is a default.
 func (c *Config) Validate() error {
-	// Check for mutually exclusive properties.
+	// Check for valid basic authentication and bearer token configuration.
 	if c.BasicAuth != nil {
+		if c.BasicAuth["username"] == "" {
+			return ErrNoBasicAuthUsername
+		}
+
+		password := c.BasicAuth["password"]
+		passwordFile := c.BasicAuth["password_file"]
+
+		if password == "" && passwordFile == "" {
+			return ErrNoBasicAuthPassword
+		}
+		if password != "" && passwordFile != "" {
+			return ErrTwoPasswords
+		}
 		if c.BearerToken != "" || c.BearerTokenFile != "" {
 			return ErrConflictingAuthorization
-		}
-		if c.BasicAuth["password"] != "" && c.BasicAuth["password_file"] != "" {
-			return ErrTwoPasswords
 		}
 	}
 	if c.BearerToken != "" && c.BearerTokenFile != "" {

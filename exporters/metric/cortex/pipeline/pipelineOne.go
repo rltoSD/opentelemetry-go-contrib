@@ -12,14 +12,12 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/exporters/metric/cortex"
-	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/metric/controller/push"
 
 	"go.opentelemetry.io/contrib/exporters/metric/cortex/utils"
 )
-
-
 
 // var pipelineOneSleepPeriod time.Duration = 1 * time.Second
 
@@ -220,7 +218,7 @@ func initCSVReader(filepath string) (*csv.Reader, error) {
 
 // parsePipelineOneRecord parses a line from a csv file and extracts the instrument type,
 // the value, and the key value pairs.
-func parsePipelineOneRecord(record []string) (string, string, string, string, []kv.KeyValue, error) {
+func parsePipelineOneRecord(record []string) (string, string, string, string, []label.KeyValue, error) {
 	// Parse the third field in the record for the key value pairs. The name and
 	// description are ignored.
 	stringFields := strings.Split(record[2], ",")
@@ -235,9 +233,9 @@ func parsePipelineOneRecord(record []string) (string, string, string, string, []
 	name := stringFields[0]
 	desc := stringFields[1]
 
-	var keyValuePairs []kv.KeyValue
+	var keyValuePairs []label.KeyValue
 	for i := 2; i < numStringFields; i += 2 {
-		keyValue := kv.String(stringFields[i], stringFields[i+1])
+		keyValue := label.String(stringFields[i], stringFields[i+1])
 		keyValuePairs = append(keyValuePairs, keyValue)
 	}
 	// fmt.Println(record)

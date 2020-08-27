@@ -19,12 +19,13 @@ import (
 	"strconv"
 
 	"github.com/Shopify/sarama"
-	"google.golang.org/grpc/codes"
 
-	"go.opentelemetry.io/otel/api/kv"
+	"go.opentelemetry.io/otel/codes"
+
 	"go.opentelemetry.io/otel/api/propagation"
-	"go.opentelemetry.io/otel/api/standard"
 	"go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/semconv"
 )
 
 type syncProducer struct {
@@ -58,8 +59,8 @@ func (p *syncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 
 // WrapSyncProducer wraps a sarama.SyncProducer so that all produced messages
 // are traced.
-func WrapSyncProducer(serviceName string, saramaConfig *sarama.Config, producer sarama.SyncProducer, opts ...Option) sarama.SyncProducer {
-	cfg := newConfig(serviceName, opts...)
+func WrapSyncProducer(saramaConfig *sarama.Config, producer sarama.SyncProducer, opts ...Option) sarama.SyncProducer {
+	cfg := newConfig(opts...)
 	if saramaConfig == nil {
 		saramaConfig = sarama.NewConfig()
 	}
@@ -131,8 +132,8 @@ type producerMessageContext struct {
 //
 // If `Return.Successes` is false, there is no way to know partition and offset of
 // the message.
-func WrapAsyncProducer(serviceName string, saramaConfig *sarama.Config, p sarama.AsyncProducer, opts ...Option) sarama.AsyncProducer {
-	cfg := newConfig(serviceName, opts...)
+func WrapAsyncProducer(saramaConfig *sarama.Config, p sarama.AsyncProducer, opts ...Option) sarama.AsyncProducer {
+	cfg := newConfig(opts...)
 	if saramaConfig == nil {
 		saramaConfig = sarama.NewConfig()
 	}
@@ -233,11 +234,10 @@ func startProducerSpan(cfg config, version sarama.KafkaVersion, msg *sarama.Prod
 	ctx := propagation.ExtractHTTP(context.Background(), cfg.Propagators, carrier)
 
 	// Create a span.
-	attrs := []kv.KeyValue{
-		standard.ServiceNameKey.String(cfg.ServiceName),
-		standard.MessagingSystemKey.String("kafka"),
-		standard.MessagingDestinationKindKeyTopic,
-		standard.MessagingDestinationKey.String(msg.Topic),
+	attrs := []label.KeyValue{
+		semconv.MessagingSystemKey.String("kafka"),
+		semconv.MessagingDestinationKindKeyTopic,
+		semconv.MessagingDestinationKey.String(msg.Topic),
 	}
 	opts := []trace.StartOption{
 		trace.WithAttributes(attrs...),
@@ -255,7 +255,7 @@ func startProducerSpan(cfg config, version sarama.KafkaVersion, msg *sarama.Prod
 
 func finishProducerSpan(span trace.Span, partition int32, offset int64, err error) {
 	span.SetAttributes(
-		standard.MessagingMessageIDKey.String(strconv.FormatInt(offset, 10)),
+		semconv.MessagingMessageIDKey.String(strconv.FormatInt(offset, 10)),
 		kafkaPartitionKey.Int32(partition),
 	)
 	if err != nil {

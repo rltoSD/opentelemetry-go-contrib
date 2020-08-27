@@ -1,3 +1,17 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package datadog
 
 import (
@@ -7,8 +21,8 @@ import (
 
 	"github.com/DataDog/datadog-go/statsd"
 
-	"go.opentelemetry.io/otel/api/label"
 	"go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/label"
 	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
 )
@@ -40,7 +54,7 @@ func NewExporter(opts Options) (*Exporter, error) {
 // Options contains options for configuring the exporter.
 type Options struct {
 	// StatsAddr specifies the host[:port] address for DogStatsD. It defaults
-	// to localhost:8125.
+	// to DefaultStatsAddrUDP.
 	StatsAddr string
 
 	// Tags specifies a set of global tags to attach to each metric.

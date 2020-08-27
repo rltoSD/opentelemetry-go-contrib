@@ -19,29 +19,20 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
-	"net/url"
 	"strconv"
+	"time"
 )
 
-var (
-	// ErrNoBasicAuthUsername occurs when no username was provided for basic
-	// authentication.
-	ErrNoBasicAuthUsername = fmt.Errorf("No username provided for basic authentication")
-
-	// ErrNoBasicAuthPassword occurs when no password or password file was provided for
-	// basic authentication.
-	ErrNoBasicAuthPassword = fmt.Errorf("No password or password file provided for basic authentication")
-
-	// ErrFailedToReadFile occurs when a password / bearer token file exists, but could
-	// not be read.
-	ErrFailedToReadFile = fmt.Errorf("Failed to read password / bearer token file")
-)
+// ErrFailedToReadFile occurs when a password / bearer token file exists, but could
+// not be read.
+var ErrFailedToReadFile = fmt.Errorf("failed to read password / bearer token file")
 
 // addBasicAuth sets the Authorization header for basic authentication using a username
-// and a password / password file. To prevent the Exporter from potentially opening a
-// password file on every request by calling this method, the Authorization header is also
-// added to the Config header map.
+// and a password / password file. The header value is not changed if an Authorization
+// header already exists and no action is taken if the Exporter is not configured with
+// basic authorization credentials.
 func (e *Exporter) addBasicAuth(req *http.Request) error {
 	// No need to add basic auth if it isn't provided or if the Authorization header is
 	// already set.
@@ -52,11 +43,7 @@ func (e *Exporter) addBasicAuth(req *http.Request) error {
 		return nil
 	}
 
-	// There must be an username for basic authentication.
 	username := e.config.BasicAuth["username"]
-	if username == "" {
-		return ErrNoBasicAuthUsername
-	}
 
 	// Use password from password file if it exists.
 	passwordFile := e.config.BasicAuth["password_file"]
@@ -72,18 +59,15 @@ func (e *Exporter) addBasicAuth(req *http.Request) error {
 
 	// Use provided password.
 	password := e.config.BasicAuth["password"]
-	if password == "" {
-		return ErrNoBasicAuthPassword
-	}
 	req.SetBasicAuth(username, password)
 
 	return nil
 }
 
 // addBearerTokenAuth sets the Authorization header for bearer tokens using a bearer token
-// string or a bearer token file. To prevent the Exporter from potentially opening a
-// bearer token file on every request by calling this method, the Authorization header is
-// also added to the Config header map.
+// string or a bearer token file. The header value is not changed if an Authorization
+// header already exists and no action is taken if the Exporter is not configured with
+// bearer token credentials.
 func (e *Exporter) addBearerTokenAuth(req *http.Request) error {
 	// No need to add bearer token auth if the Authorization header is already set.
 	if _, exists := e.config.Headers["Authorization"]; exists {
@@ -119,30 +103,38 @@ func (e *Exporter) buildClient() (*http.Client, error) {
 		return nil, err
 	}
 
+	// Create a custom HTTP Transport for the client. This is the same as
+	// http.DefaultTransport other than the TLSClientConfig.
 	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       tlsConfig,
 	}
 
 	// Convert proxy url to proxy function for use in the created Transport.
-	if e.config.ProxyURL != "" {
-		proxyURL, err := url.Parse(e.config.ProxyURL)
-		if err != nil {
-			return nil, err
-		}
-		proxy := http.ProxyURL(proxyURL)
+	if e.config.ProxyURL != nil {
+		proxy := http.ProxyURL(e.config.ProxyURL)
 		transport.Proxy = proxy
 	}
 
-	// Create and return a client that
 	client := http.Client{
 		Transport: transport,
 		Timeout:   e.config.RemoteTimeout,
 	}
-
 	return &client, nil
 }
 
-// buildTLSConfig uses the TLSConfig map in Config to create a tls.Config struct.
+// buildTLSConfig creates a new TLS Config struct with the properties from the exporter's
+// Config struct.
 func (e *Exporter) buildTLSConfig() (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
 	if e.config.TLSConfig == nil {
@@ -155,54 +147,35 @@ func (e *Exporter) buildTLSConfig() (*tls.Config, error) {
 	}
 
 	// Set InsecureSkipVerify. Viper reads the bool as a string since it is in a map.
-	parsedBool, err := strconv.ParseBool(e.config.TLSConfig["insecure_skip_verify"])
-	if err != nil {
-		return nil, err
+	if isv, ok := e.config.TLSConfig["insecure_skip_verify"]; ok {
+		var err error
+		if tlsConfig.InsecureSkipVerify, err = strconv.ParseBool(isv); err != nil {
+			return nil, err
+		}
 	}
-	tlsConfig.InsecureSkipVerify = parsedBool
 
 	// Load certificates from CA file if it exists.
-	if err := e.loadCACertificates(tlsConfig); err != nil {
-		return nil, err
-	}
-
-	// Load the client certificate if it exists.
-	if err := e.loadClientCertificate(tlsConfig); err != nil {
-		return nil, err
-	}
-
-	return tlsConfig, nil
-}
-
-// loadCACertificates reads a CA file and updates the certificate pool in a tls Config
-// struct.
-func (e *Exporter) loadCACertificates(tlsConfig *tls.Config) error {
 	caFile := e.config.TLSConfig["ca_file"]
-
 	if caFile != "" {
 		caFileData, err := ioutil.ReadFile(caFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		certPool := x509.NewCertPool()
 		certPool.AppendCertsFromPEM(caFileData)
 		tlsConfig.RootCAs = certPool
 	}
-	return nil
-}
 
-// loadClientCertificate reads a certificate file and key and stores it in a tls Config
-// struct.
-func (e *Exporter) loadClientCertificate(tlsConfig *tls.Config) error {
+	// Load the client certificate if it exists.
 	certFile := e.config.TLSConfig["cert_file"]
 	keyFile := e.config.TLSConfig["key_file"]
-
 	if certFile != "" && keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-	return nil
+
+	return tlsConfig, nil
 }

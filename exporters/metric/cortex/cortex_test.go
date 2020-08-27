@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.opentelemetry.io/otel/api/global"
-	"go.opentelemetry.io/otel/api/kv"
+	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/export/metric"
 	export "go.opentelemetry.io/otel/sdk/export/metric"
 	"go.opentelemetry.io/otel/sdk/export/metric/aggregation"
@@ -56,7 +56,7 @@ var validConfig = Config{
 		"server_name":          "server",
 		"insecure_skip_verify": "1",
 	},
-	ProxyURL:     "",
+	ProxyURL:     nil,
 	PushInterval: 10 * time.Second,
 	Headers: map[string]string{
 		"x-prometheus-remote-write-version": "0.1.0",
@@ -65,12 +65,12 @@ var validConfig = Config{
 	Client: http.DefaultClient,
 }
 
-var testResource = resource.New(kv.String("R", "V"))
+var testResource = resource.New(label.String("R", "V"))
 var mockTime int64 = time.Time{}.Unix()
 
 func TestExportKindFor(t *testing.T) {
 	exporter := Exporter{}
-	got := exporter.ExportKindFor(nil, aggregation.Kind(0))
+	got := exporter.ExportKindFor(nil, aggregation.Kind(rune(0)))
 	want := metric.CumulativeExporter
 
 	if got != want {
@@ -190,8 +190,9 @@ func TestAddHeaders(t *testing.T) {
 
 	// Create http request to add headers to.
 	req, err := http.NewRequest("POST", "test.com", nil)
-	require.Nil(t, err)
-	exporter.addHeaders(req)
+	require.NoError(t, err)
+	err = exporter.addHeaders(req)
+	require.NoError(t, err)
 
 	// Check that all the headers are there.
 	for name, field := range testConfig.Headers {
@@ -212,7 +213,7 @@ func TestBuildMessage(t *testing.T) {
 	// package has its own tests, buildMessage should work as expected as long as there
 	// are no errors.
 	_, err := exporter.buildMessage(timeseries)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // TestBuildRequest tests whether a http request is a POST request, has the correct body,
@@ -224,14 +225,14 @@ func TestBuildRequest(t *testing.T) {
 
 	// Create the http request.
 	req, err := exporter.buildRequest(testMessage)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Verify the http method, url, and body.
 	require.Equal(t, req.Method, http.MethodPost)
 	require.Equal(t, req.URL.String(), validConfig.Endpoint)
 
 	reqMessage, err := ioutil.ReadAll(req.Body)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, reqMessage, testMessage)
 
 	// Verify headers.
@@ -328,11 +329,11 @@ func TestSendRequest(t *testing.T) {
 
 			// Create an empty Snappy-compressed message.
 			msg, err := exporter.buildMessage([]*prompb.TimeSeries{})
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// Create a http POST request with the compressed message.
 			req, err := exporter.buildRequest(msg)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// Send the request to the test server and verify the error.
 			err = exporter.sendRequest(req)
@@ -340,7 +341,7 @@ func TestSendRequest(t *testing.T) {
 				errorString := err.Error()
 				require.Equal(t, errorString, test.expectedError.Error())
 			} else {
-				require.Nil(t, test.expectedError)
+				require.NoError(t, test.expectedError)
 			}
 		})
 	}

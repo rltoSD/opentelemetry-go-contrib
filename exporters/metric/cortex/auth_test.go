@@ -22,27 +22,21 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// createFile writes a file with a slice of bytes at a specified filepath.
-func createFile(bytes []byte, filepath string) error {
-	err := ioutil.WriteFile(filepath, bytes, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 // TestAuthentication checks whether http requests are properly authenticated with either
 // bearer tokens or basic authentication in the addHeaders method.
@@ -67,22 +61,6 @@ func TestAuthentication(t *testing.T) {
 				[]byte("TestUser:TestPassword"),
 			),
 			expectedError: nil,
-		},
-		{
-			testName: "Basic Auth with no username",
-			basicAuth: map[string]string{
-				"password": "TestPassword",
-			},
-			expectedAuthHeaderValue: "",
-			expectedError:           ErrNoBasicAuthUsername,
-		},
-		{
-			testName: "Basic Auth with no password",
-			basicAuth: map[string]string{
-				"username": "TestUser",
-			},
-			expectedAuthHeaderValue: "",
-			expectedError:           ErrNoBasicAuthPassword,
 		},
 		{
 			testName: "Basic Auth with password file",
@@ -132,7 +110,8 @@ func TestAuthentication(t *testing.T) {
 			// response body.
 			handler := func(rw http.ResponseWriter, req *http.Request) {
 				authHeaderValue := req.Header.Get("Authorization")
-				rw.Write([]byte(authHeaderValue))
+				_, err := rw.Write([]byte(authHeaderValue))
+				require.NoError(t, err)
 			}
 			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
@@ -143,14 +122,14 @@ func TestAuthentication(t *testing.T) {
 				if passwordFile != "" && test.basicAuthPasswordFileContents != nil {
 					filepath := "./" + test.basicAuth["password_file"]
 					err := createFile(test.basicAuthPasswordFileContents, filepath)
-					require.Nil(t, err)
+					require.NoError(t, err)
 					defer os.Remove(filepath)
 				}
 			}
 			if test.bearerTokenFile != "" && test.bearerTokenFileContents != nil {
 				filepath := "./" + test.bearerTokenFile
 				err := createFile(test.bearerTokenFileContents, filepath)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				defer os.Remove(filepath)
 			}
 
@@ -164,14 +143,14 @@ func TestAuthentication(t *testing.T) {
 				},
 			}
 			req, err := http.NewRequest(http.MethodPost, server.URL, nil)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			err = exporter.addHeaders(req)
 
 			// Verify the error and if the Authorization header was correctly set.
 			if err != nil {
 				require.Equal(t, err.Error(), test.expectedError.Error())
 			} else {
-				require.Nil(t, test.expectedError)
+				require.NoError(t, test.expectedError)
 				authHeaderValue := req.Header.Get("Authorization")
 				require.Equal(t, authHeaderValue, test.expectedAuthHeaderValue)
 			}
@@ -179,27 +158,39 @@ func TestAuthentication(t *testing.T) {
 	}
 }
 
+// createFile writes a file with a slice of bytes at a specified filepath.
+func createFile(bytes []byte, filepath string) error {
+	err := ioutil.WriteFile(filepath, bytes, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // TestBuildClient checks whether the buildClient successfully creates a client that can
 // connect over TLS and has the correct remote timeout and proxy url.
 func TestBuildClient(t *testing.T) {
+	testProxyURL, err := url.Parse("123.4.5.6")
+	require.NoError(t, err)
+
 	tests := []struct {
-		testName              string
-		config                Config
-		expectedRemoteTimeout time.Duration
-		expectedErrorSuffix   string
+		testName               string
+		config                 Config
+		expectedRemoteTimeout  time.Duration
+		expectedErrorSubstring string
 	}{
 		{
 			testName: "Remote Timeout with Proxy URL",
 			config: Config{
-				ProxyURL:      "123.4.5.6",
+				ProxyURL:      testProxyURL,
 				RemoteTimeout: 123 * time.Second,
 				TLSConfig: map[string]string{
 					"ca_file":              "./ca_cert.pem",
 					"insecure_skip_verify": "0",
 				},
 			},
-			expectedRemoteTimeout: 123 * time.Second,
-			expectedErrorSuffix:   "proxyconnect tcp: dial tcp :0: connect: can't assign requested address",
+			expectedRemoteTimeout:  123 * time.Second,
+			expectedErrorSubstring: "proxyconnect tcp",
 		},
 		{
 			testName: "No Timeout or Proxy URL, InsecureSkipVerify is false",
@@ -209,7 +200,7 @@ func TestBuildClient(t *testing.T) {
 					"insecure_skip_verify": "0",
 				},
 			},
-			expectedErrorSuffix: "",
+			expectedErrorSubstring: "",
 		},
 		{
 			testName: "No Timeout or Proxy URL, InsecureSkipVerify is true",
@@ -219,14 +210,14 @@ func TestBuildClient(t *testing.T) {
 					"insecure_skip_verify": "1",
 				},
 			},
-			expectedErrorSuffix: "",
+			expectedErrorSubstring: "",
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
 			// Create and start the TLS server.
 			handler := func(rw http.ResponseWriter, req *http.Request) {
-				rw.Write([]byte("Successfully received HTTP request!"))
+				fmt.Fprint(rw, "Successfully received HTTP request!")
 			}
 			server := httptest.NewTLSServer(http.HandlerFunc(handler))
 			defer server.Close()
@@ -238,7 +229,8 @@ func TestBuildClient(t *testing.T) {
 				Type:  "CERTIFICATE",
 				Bytes: encodedCACert,
 			})
-			createFile(caCertPEM, "./ca_cert.pem")
+			err := createFile(caCertPEM, "./ca_cert.pem")
+			require.NoError(t, err)
 			defer os.Remove("ca_cert.pem")
 
 			// Create an Exporter client and check the timeout.
@@ -246,19 +238,21 @@ func TestBuildClient(t *testing.T) {
 				config: test.config,
 			}
 			client, err := exporter.buildClient()
-			require.Nil(t, err)
-			require.Equal(t, client.Timeout, test.expectedRemoteTimeout)
+			require.NoError(t, err)
+			assert.Equal(t, client.Timeout, test.expectedRemoteTimeout)
 
 			// Attempt to send the request and verify that the correct error occurred. If
-			// an error is expected, the test checks the error string's suffix since the
-			// error can contain the server URL, which changes every test.
+			// an error is expected, the test checks if the error string contains the
+			// expected error substring since the error can contain the server URL, which
+			// changes every test.
 			_, err = client.Get(server.URL)
-			if test.expectedErrorSuffix != "" {
-				require.Error(t, err)
-				errorSuffix := strings.HasSuffix(err.Error(), test.expectedErrorSuffix)
-				require.True(t, errorSuffix)
+			if test.expectedErrorSubstring != "" {
+				if assert.Error(t, err) {
+					hasErrorSubstring := strings.Contains(err.Error(), test.expectedErrorSubstring)
+					assert.True(t, hasErrorSubstring, "missing error message")
+				}
 			} else {
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -270,7 +264,7 @@ func TestBuildClient(t *testing.T) {
 func TestMutualTLS(t *testing.T) {
 	// Generate certificate authority certificate to sign other certificates.
 	caCert, caPrivateKey, err := generateCACertFiles("./ca_cert.pem", "./ca_key.pem")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer os.Remove("./ca_cert.pem")
 	defer os.Remove("./ca_key.pem")
 
@@ -282,7 +276,7 @@ func TestMutualTLS(t *testing.T) {
 		"./serving_cert.pem",
 		"./serving_key.pem",
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer os.Remove("./serving_cert.pem")
 	defer os.Remove("./serving_key.pem")
 
@@ -294,7 +288,7 @@ func TestMutualTLS(t *testing.T) {
 		"./client_cert.pem",
 		"./client_key.pem",
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer os.Remove("./client_cert.pem")
 	defer os.Remove("./client_key.pem")
 
@@ -304,11 +298,11 @@ func TestMutualTLS(t *testing.T) {
 		"serving_cert.pem",
 		"serving_key.pem",
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Create and start the TLS server.
 	handler := func(rw http.ResponseWriter, req *http.Request) {
-		rw.Write([]byte("Successfully verified client and received request!"))
+		fmt.Fprint(rw, "Successfully verified client and received request!")
 	}
 	server := httptest.NewUnstartedServer(http.HandlerFunc(handler))
 	server.TLS = serverTLSConfig
@@ -327,11 +321,11 @@ func TestMutualTLS(t *testing.T) {
 		},
 	}
 	client, err := exporter.buildClient()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Send the request and verify that the request was successfully received.
 	res, err := client.Get(server.URL)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	defer res.Body.Close()
 }
 
@@ -364,19 +358,34 @@ func generateCertFiles(
 	}
 
 	// Write the certificate to the local directory.
-	certPEM := pem.EncodeToMemory(&pem.Block{
+	certFile, err := os.Create(certFilepath)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = pem.Encode(certFile, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: encodedCert,
 	})
-	createFile(certPEM, certFilepath)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Write the private key to the local directory.
 	encodedPrivateKey, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
+	if err != nil {
+		return nil, nil, err
+	}
+	keyFile, err := os.Create(keyFilepath)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = pem.Encode(keyFile, &pem.Block{
 		Type:  "PRIVATE KEY",
 		Bytes: encodedPrivateKey,
 	})
-	createFile(privateKeyPEM, keyFilepath)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Parse the newly created certificate so it can be returned.
 	cert, err := x509.ParseCertificate(encodedCert)

@@ -23,28 +23,36 @@ import (
 	"github.com/Shopify/sarama/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
 
-	"go.opentelemetry.io/otel/api/kv"
+	"go.opentelemetry.io/otel/codes"
+
 	"go.opentelemetry.io/otel/api/propagation"
-	"go.opentelemetry.io/otel/api/standard"
 	"go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/semconv"
 
 	mocktracer "go.opentelemetry.io/contrib/internal/trace"
 )
 
+func newProviderAndTracer() (*mocktracer.Provider, *mocktracer.Tracer) {
+	var provider mocktracer.Provider
+	tracer := provider.Tracer(defaultTracerName)
+
+	return &provider, tracer.(*mocktracer.Tracer)
+}
+
 func TestWrapSyncProducer(t *testing.T) {
 	var err error
 
-	// Mock tracer
-	mt := mocktracer.NewTracer("kafka")
+	// Mock provider
+	provider, mt := newProviderAndTracer()
 
 	cfg := newSaramaConfig()
 	// Mock sync producer
 	mockSyncProducer := mocks.NewSyncProducer(t, cfg)
 
 	// Wrap sync producer
-	syncProducer := WrapSyncProducer(serviceName, cfg, mockSyncProducer, WithTracer(mt))
+	syncProducer := WrapSyncProducer(cfg, mockSyncProducer, WithTraceProvider(provider))
 
 	// Create message with span context
 	ctx, _ := mt.Start(context.Background(), "")
@@ -53,53 +61,49 @@ func TestWrapSyncProducer(t *testing.T) {
 
 	// Expected
 	expectedList := []struct {
-		kvList       []kv.KeyValue
+		labelList    []label.KeyValue
 		parentSpanID trace.SpanID
 		kind         trace.SpanKind
 	}{
 		{
-			kvList: []kv.KeyValue{
-				standard.ServiceNameKey.String(serviceName),
-				standard.MessagingSystemKey.String("kafka"),
-				standard.MessagingDestinationKindKeyTopic,
-				standard.MessagingDestinationKey.String(topic),
-				standard.MessagingMessageIDKey.String("1"),
+			labelList: []label.KeyValue{
+				semconv.MessagingSystemKey.String("kafka"),
+				semconv.MessagingDestinationKindKeyTopic,
+				semconv.MessagingDestinationKey.String(topic),
+				semconv.MessagingMessageIDKey.String("1"),
 				kafkaPartitionKey.Int32(0),
 			},
 			parentSpanID: trace.SpanFromContext(ctx).SpanContext().SpanID,
 			kind:         trace.SpanKindProducer,
 		},
 		{
-			kvList: []kv.KeyValue{
-				standard.ServiceNameKey.String(serviceName),
-				standard.MessagingSystemKey.String("kafka"),
-				standard.MessagingDestinationKindKeyTopic,
-				standard.MessagingDestinationKey.String(topic),
-				standard.MessagingMessageIDKey.String("2"),
+			labelList: []label.KeyValue{
+				semconv.MessagingSystemKey.String("kafka"),
+				semconv.MessagingDestinationKindKeyTopic,
+				semconv.MessagingDestinationKey.String(topic),
+				semconv.MessagingMessageIDKey.String("2"),
 				kafkaPartitionKey.Int32(0),
 			},
 			kind: trace.SpanKindProducer,
 		},
 		{
-			kvList: []kv.KeyValue{
-				standard.ServiceNameKey.String(serviceName),
-				standard.MessagingSystemKey.String("kafka"),
-				standard.MessagingDestinationKindKeyTopic,
-				standard.MessagingDestinationKey.String(topic),
+			labelList: []label.KeyValue{
+				semconv.MessagingSystemKey.String("kafka"),
+				semconv.MessagingDestinationKindKeyTopic,
+				semconv.MessagingDestinationKey.String(topic),
 				// TODO: The mock sync producer of sarama does not handle the offset while sending messages
 				// https://github.com/Shopify/sarama/pull/1747
-				//standard.MessagingMessageIDKey.String("3"),
+				//semconv.MessagingMessageIDKey.String("3"),
 				kafkaPartitionKey.Int32(0),
 			},
 			kind: trace.SpanKindProducer,
 		},
 		{
-			kvList: []kv.KeyValue{
-				standard.ServiceNameKey.String(serviceName),
-				standard.MessagingSystemKey.String("kafka"),
-				standard.MessagingDestinationKindKeyTopic,
-				standard.MessagingDestinationKey.String(topic),
-				//standard.MessagingMessageIDKey.String("4"),
+			labelList: []label.KeyValue{
+				semconv.MessagingSystemKey.String("kafka"),
+				semconv.MessagingDestinationKindKeyTopic,
+				semconv.MessagingDestinationKey.String(topic),
+				//semconv.MessagingMessageIDKey.String("4"),
 				kafkaPartitionKey.Int32(0),
 			},
 			kind: trace.SpanKindProducer,
@@ -133,7 +137,7 @@ func TestWrapSyncProducer(t *testing.T) {
 		assert.Equal(t, expected.parentSpanID, span.ParentSpanID)
 		assert.Equal(t, "kafka.produce", span.Name)
 		assert.Equal(t, expected.kind, span.Kind)
-		for _, k := range expected.kvList {
+		for _, k := range expected.labelList {
 			assert.Equal(t, k.Value, span.Attributes[k.Key], k.Key)
 		}
 
@@ -158,10 +162,12 @@ func TestWrapAsyncProducer(t *testing.T) {
 	}
 
 	t.Run("without successes config", func(t *testing.T) {
-		mt := mocktracer.NewTracer("kafka")
+		// Mock provider
+		provider, mt := newProviderAndTracer()
+
 		cfg := newSaramaConfig()
 		mockAsyncProducer := mocks.NewAsyncProducer(t, cfg)
-		ap := WrapAsyncProducer(serviceName, cfg, mockAsyncProducer, WithTracer(mt))
+		ap := WrapAsyncProducer(cfg, mockAsyncProducer, WithTraceProvider(provider))
 
 		msgList := createMessages(mt)
 		// Send message
@@ -177,29 +183,27 @@ func TestWrapAsyncProducer(t *testing.T) {
 
 		// Expected
 		expectedList := []struct {
-			kvList       []kv.KeyValue
+			labelList    []label.KeyValue
 			parentSpanID trace.SpanID
 			kind         trace.SpanKind
 		}{
 			{
-				kvList: []kv.KeyValue{
-					standard.ServiceNameKey.String(serviceName),
-					standard.MessagingSystemKey.String("kafka"),
-					standard.MessagingDestinationKindKeyTopic,
-					standard.MessagingDestinationKey.String(topic),
-					standard.MessagingMessageIDKey.String("0"),
+				labelList: []label.KeyValue{
+					semconv.MessagingSystemKey.String("kafka"),
+					semconv.MessagingDestinationKindKeyTopic,
+					semconv.MessagingDestinationKey.String(topic),
+					semconv.MessagingMessageIDKey.String("0"),
 					kafkaPartitionKey.Int32(0),
 				},
 				parentSpanID: trace.SpanID{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
 				kind:         trace.SpanKindProducer,
 			},
 			{
-				kvList: []kv.KeyValue{
-					standard.ServiceNameKey.String(serviceName),
-					standard.MessagingSystemKey.String("kafka"),
-					standard.MessagingDestinationKindKeyTopic,
-					standard.MessagingDestinationKey.String(topic),
-					standard.MessagingMessageIDKey.String("0"),
+				labelList: []label.KeyValue{
+					semconv.MessagingSystemKey.String("kafka"),
+					semconv.MessagingDestinationKindKeyTopic,
+					semconv.MessagingDestinationKey.String(topic),
+					semconv.MessagingMessageIDKey.String("0"),
 					kafkaPartitionKey.Int32(0),
 				},
 				kind: trace.SpanKindProducer,
@@ -214,7 +218,7 @@ func TestWrapAsyncProducer(t *testing.T) {
 			assert.Equal(t, expected.parentSpanID, span.ParentSpanID)
 			assert.Equal(t, "kafka.produce", span.Name)
 			assert.Equal(t, expected.kind, span.Kind)
-			for _, k := range expected.kvList {
+			for _, k := range expected.labelList {
 				assert.Equal(t, k.Value, span.Attributes[k.Key], k.Key)
 			}
 
@@ -225,14 +229,15 @@ func TestWrapAsyncProducer(t *testing.T) {
 	})
 
 	t.Run("with successes config", func(t *testing.T) {
-		mt := mocktracer.NewTracer("kafka")
+		// Mock provider
+		provider, mt := newProviderAndTracer()
 
 		// Set producer with successes config
 		cfg := newSaramaConfig()
 		cfg.Producer.Return.Successes = true
 
 		mockAsyncProducer := mocks.NewAsyncProducer(t, cfg)
-		ap := WrapAsyncProducer(serviceName, cfg, mockAsyncProducer, WithTracer(mt))
+		ap := WrapAsyncProducer(cfg, mockAsyncProducer, WithTraceProvider(provider))
 
 		msgList := createMessages(mt)
 		// Send message
@@ -252,29 +257,27 @@ func TestWrapAsyncProducer(t *testing.T) {
 
 		// Expected
 		expectedList := []struct {
-			kvList       []kv.KeyValue
+			labelList    []label.KeyValue
 			parentSpanID trace.SpanID
 			kind         trace.SpanKind
 		}{
 			{
-				kvList: []kv.KeyValue{
-					standard.ServiceNameKey.String(serviceName),
-					standard.MessagingSystemKey.String("kafka"),
-					standard.MessagingDestinationKindKeyTopic,
-					standard.MessagingDestinationKey.String(topic),
-					standard.MessagingMessageIDKey.String("1"),
+				labelList: []label.KeyValue{
+					semconv.MessagingSystemKey.String("kafka"),
+					semconv.MessagingDestinationKindKeyTopic,
+					semconv.MessagingDestinationKey.String(topic),
+					semconv.MessagingMessageIDKey.String("1"),
 					kafkaPartitionKey.Int32(0),
 				},
 				parentSpanID: trace.SpanID{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
 				kind:         trace.SpanKindProducer,
 			},
 			{
-				kvList: []kv.KeyValue{
-					standard.ServiceNameKey.String(serviceName),
-					standard.MessagingSystemKey.String("kafka"),
-					standard.MessagingDestinationKindKeyTopic,
-					standard.MessagingDestinationKey.String(topic),
-					standard.MessagingMessageIDKey.String("2"),
+				labelList: []label.KeyValue{
+					semconv.MessagingSystemKey.String("kafka"),
+					semconv.MessagingDestinationKindKeyTopic,
+					semconv.MessagingDestinationKey.String(topic),
+					semconv.MessagingMessageIDKey.String("2"),
 					kafkaPartitionKey.Int32(0),
 				},
 				kind: trace.SpanKindProducer,
@@ -289,7 +292,7 @@ func TestWrapAsyncProducer(t *testing.T) {
 			assert.Equal(t, expected.parentSpanID, span.ParentSpanID)
 			assert.Equal(t, "kafka.produce", span.Name)
 			assert.Equal(t, expected.kind, span.Kind)
-			for _, k := range expected.kvList {
+			for _, k := range expected.labelList {
 				assert.Equal(t, k.Value, span.Attributes[k.Key], k.Key)
 			}
 
@@ -304,14 +307,15 @@ func TestWrapAsyncProducer(t *testing.T) {
 }
 
 func TestWrapAsyncProducerError(t *testing.T) {
-	mt := mocktracer.NewTracer("kafka")
+	// Mock provider
+	provider, mt := newProviderAndTracer()
 
 	// Set producer with successes config
 	cfg := newSaramaConfig()
 	cfg.Producer.Return.Successes = true
 
 	mockAsyncProducer := mocks.NewAsyncProducer(t, cfg)
-	ap := WrapAsyncProducer(serviceName, cfg, mockAsyncProducer, WithTracer(mt))
+	ap := WrapAsyncProducer(cfg, mockAsyncProducer, WithTraceProvider(provider))
 
 	mockAsyncProducer.ExpectInputAndFail(errors.New("test"))
 	ap.Input() <- &sarama.ProducerMessage{Topic: topic, Key: sarama.StringEncoder("foo2")}
@@ -337,15 +341,15 @@ func newSaramaConfig() *sarama.Config {
 }
 
 func BenchmarkWrapSyncProducer(b *testing.B) {
-	// Mock tracer
-	mt := mocktracer.NewTracer("kafka")
+	// Mock provider
+	provider, _ := newProviderAndTracer()
 
 	cfg := newSaramaConfig()
 	// Mock sync producer
 	mockSyncProducer := mocks.NewSyncProducer(b, cfg)
 
 	// Wrap sync producer
-	syncProducer := WrapSyncProducer(serviceName, cfg, mockSyncProducer, WithTracer(mt))
+	syncProducer := WrapSyncProducer(cfg, mockSyncProducer, WithTraceProvider(provider))
 	message := sarama.ProducerMessage{Key: sarama.StringEncoder("foo")}
 
 	b.ReportAllocs()
@@ -378,15 +382,15 @@ func BenchmarkMockSyncProducer(b *testing.B) {
 }
 
 func BenchmarkWrapAsyncProducer(b *testing.B) {
-	// Mock tracer
-	mt := mocktracer.NewTracer("kafka")
+	// Mock provider
+	provider, _ := newProviderAndTracer()
 
 	cfg := newSaramaConfig()
 	cfg.Producer.Return.Successes = true
 	mockAsyncProducer := mocks.NewAsyncProducer(b, cfg)
 
 	// Wrap sync producer
-	asyncProducer := WrapAsyncProducer(serviceName, cfg, mockAsyncProducer, WithTracer(mt))
+	asyncProducer := WrapAsyncProducer(cfg, mockAsyncProducer, WithTraceProvider(provider))
 	message := sarama.ProducerMessage{Key: sarama.StringEncoder("foo")}
 
 	b.ReportAllocs()

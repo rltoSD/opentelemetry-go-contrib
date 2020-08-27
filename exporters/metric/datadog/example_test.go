@@ -1,3 +1,17 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package datadog_test
 
 import (
@@ -13,8 +27,8 @@ import (
 
 	"go.opentelemetry.io/contrib/exporters/metric/datadog"
 	"go.opentelemetry.io/otel/api/global"
-	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/api/metric"
+	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/metric/controller/push"
 	"go.opentelemetry.io/otel/sdk/metric/processor/basic"
 	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
@@ -25,15 +39,17 @@ type TestUDPServer struct {
 }
 
 func ExampleExporter() {
+	const testHostPort = ":8159"
 	selector := simple.NewWithSketchDistribution(ddsketch.NewDefaultConfig())
 	exp, err := datadog.NewExporter(datadog.Options{
+		StatsAddr:     testHostPort,
 		Tags:          []string{"env:dev"},
 		StatsDOptions: []statsd.Option{statsd.WithoutTelemetry()},
 	})
 	if err != nil {
 		panic(err)
 	}
-	s, err := getTestServer(datadog.DefaultStatsAddrUDP)
+	s, err := getTestServer(testHostPort)
 	if err != nil {
 		panic(err)
 	}
@@ -48,7 +64,7 @@ func ExampleExporter() {
 		global.SetMeterProvider(pusher.Provider())
 		meter := global.Meter("marwandist")
 		m := metric.Must(meter).NewInt64ValueRecorder("myrecorder")
-		meter.RecordBatch(context.Background(), []kv.KeyValue{kv.Int("l", 1)},
+		meter.RecordBatch(context.Background(), []label.KeyValue{label.Int("l", 1)},
 			m.Measurement(1), m.Measurement(50), m.Measurement(100))
 	}()
 
