@@ -21,16 +21,16 @@ func main() {
 
 	// Export to Cortex.
 	fmt.Printf("Exporting data to Cortex!\n")
-	runPipelineOne()
-	// runPipelineTwo()
+	// runPipelineOne()
+	runPipelineTwo()
 
-	// Query Cortex and write results to `pipelineOneOutputFile`.
-	fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
-	storePipelineOneResults()
+	// // Query Cortex and write results to `pipelineOneOutputFile`.
+	// fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
+	// storePipelineOneResults()
 
-	// Validate that the results file and the answers file are the same.
-	fmt.Printf("\nComparing the results and answers files!\n")
-	validatePipelineOne()
+	// // Validate that the results file and the answers file are the same.
+	// fmt.Printf("\nComparing the results and answers files!\n")
+	// validatePipelineOne()
 
 	// Print out elapsed time.
 	elapsed := time.Since(start)

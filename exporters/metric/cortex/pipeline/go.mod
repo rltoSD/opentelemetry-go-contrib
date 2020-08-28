@@ -6,6 +6,7 @@ go 1.14
 replace go.opentelemetry.io/contrib/exporters/metric/cortex => ../
 
 require (
+	github.com/beorn7/perks v1.0.1
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/gjson v1.6.0
