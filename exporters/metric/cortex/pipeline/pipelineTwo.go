@@ -85,7 +85,6 @@ func runPipelineTwo() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		var checkpointSet *CheckpointSet
 		switch aggType {
 		case "sum":
@@ -139,7 +138,7 @@ func buildCheckpointSet(aggType string, name string, labels []label.KeyValue, va
 		log.Fatal(err)
 	}
 
-	checkpointSet.Add(time.Now(), &descriptor, checkpoint)
+	checkpointSet.Add(time.Now(), &descriptor, checkpoint, labels...)
 
 	return checkpointSet
 }
@@ -182,7 +181,7 @@ func checkedUpdate(agg export.Aggregator, number metric.Number, descriptor *metr
 
 func initPipelineTwoCSVReader() *csv.Reader {
 	// Open the csv file to read from.
-	data, err := os.Open("data/PrometheusDataSecond.csv")
+	data, err := os.Open(pipelineTwoFilename)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -13,16 +13,17 @@ import (
 var pipelineOneFilename string = "data/PrometheusDataFirst.csv"
 var pipelineOneSleepPeriod time.Duration = 0 * time.Millisecond
 var pipelineOneOutputFile string = "data/pipelineOneResults.csv"
+var pipelineTwoFilename string = "data/PrometheusDataSecond.csv"
+var pipelineTwoOutputFile string = "data/pipelineTwoResults.csv"
 
 func main() {
 	// Start a timer to measure how long pipeline test takes.
 	start := time.Now()
 	fmt.Printf("Starting pipeline test!\n\n")
 
-	// Export to Cortex.
-	fmt.Printf("Exporting data to Cortex!\n")
+	// // Export to Cortex.
+	// fmt.Printf("Exporting data to Cortex!\n")
 	// runPipelineOne()
-	runPipelineTwo()
 
 	// // Query Cortex and write results to `pipelineOneOutputFile`.
 	// fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
@@ -31,6 +32,18 @@ func main() {
 	// // Validate that the results file and the answers file are the same.
 	// fmt.Printf("\nComparing the results and answers files!\n")
 	// validatePipelineOne()
+
+	// Export to Cortex.
+	fmt.Printf("Exporting data to Cortex!\n")
+	runPipelineTwo()
+
+	// Query Cortex and write results to `pipelineOneOutputFile`.
+	fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
+	storePipelineTwoResults()
+
+	// Validate that the results file and the answers file are the same.
+	fmt.Printf("\nComparing the results and answers files!\n")
+	validatePipelineTwo()
 
 	// Print out elapsed time.
 	elapsed := time.Since(start)
@@ -58,5 +71,28 @@ func validatePipelineOne() {
 		os.Remove(pipelineOneOutputFile)
 	} else {
 		fmt.Println("[Failure] Pipeline One Validation Failed. Check files.")
+	}
+}
+
+// validatePipelineTwo opens and compares the results and answers file for pipeline one.
+// It prints whether the files are the same and removes the results file if it is.
+func validatePipelineTwo() {
+	results, err := ioutil.ReadFile("data/pipelineTwoResults.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	answers, err := ioutil.ReadFile("data/PrometheusAnswersSecond.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	equal := bytes.Equal(results, answers)
+
+	if equal {
+		fmt.Println("[Success] Pipeline Two Validation Succeeded.")
+		os.Remove(pipelineTwoOutputFile)
+	} else {
+		fmt.Println("[Failure] Pipeline Two Validation Failed. Check files.")
 	}
 }
