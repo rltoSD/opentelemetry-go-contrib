@@ -154,10 +154,10 @@ func runPipelineOne() {
 
 		// Print a message based on whether a record was skipped or not.
 		if invalidRecord {
-			fmt.Printf("%v. [Skipped] Unsupported Record %v \n", i, record)
+			fmt.Printf("%v. [P1 Skipped] Unsupported Record %v \n", i, record)
 			invalidRecord = false
 		} else {
-			fmt.Printf("%v. [Success] Parsed %v\n", i, record)
+			fmt.Printf("%v. [P1 Success] Parsed %v\n", i, record)
 		}
 
 		// Sleep for a while so the push controller won't push too much data at once.
@@ -173,14 +173,14 @@ func initPipeline(pushInterval time.Duration) (*push.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("[Success] Created Config struct")
+	fmt.Println("[P1 Success] Created Config struct")
 
 	// Run exporter setup pipeline.
 	pusher, err := cortex.InstallNewPipeline(*config, push.WithPeriod(pushInterval))
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("[Success] Installed Exporter Pipeline")
+	fmt.Println("[P1 Success] Installed Exporter Pipeline")
 
 	return pusher, nil
 }

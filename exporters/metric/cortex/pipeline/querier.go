@@ -157,8 +157,6 @@ func storePipelineTwoResults() error {
 			}
 		}
 
-		// fmt.Println(instrumentData)
-
 		// Convert the InstrumentData struct into a csv record in the same format as the
 		// generated answers file.
 		outputRecord := convertToRecord(instrumentData)
@@ -167,35 +165,6 @@ func storePipelineTwoResults() error {
 		file.WriteString(outputRecord + "\n")
 	}
 	return nil
-}
-
-// querySumInstrument queries Cortex for an instrument that uses the Sum aggregation.
-// Only the name, labels, and sum properties will be filled.
-func queryLastValueInstrument(url string) (*InstrumentData, error) {
-	// Create a sum aggregation InstrumentData struct.
-	instrumentData := InstrumentData{
-		aggregation: "lval",
-	}
-
-	// Retrieve the JSON response from Cortex.
-	json, err := getJSON(url)
-	if err != nil {
-		return nil, err
-	}
-
-	// Retrieve sum from JSON.
-	lastValue := gjson.Get(json, "data.result.0.value.1")
-
-	// Retrieve the name and labels. They are stored in a `metric` JSON object.
-	metric := gjson.Get(json, "data.result.0.metric")
-	name, labels := parseMetric(metric)
-
-	// Set the struct properties.
-	instrumentData.name = name
-	instrumentData.labels = labels
-	instrumentData.value = lastValue.Float()
-
-	return &instrumentData, nil
 }
 
 // querySumInstrument queries Cortex for an instrument that uses the Sum aggregation.
@@ -227,6 +196,93 @@ func querySumInstrument(url string) (*InstrumentData, error) {
 	return &instrumentData, nil
 }
 
+// querySumInstrument queries Cortex for an instrument that uses the Sum aggregation.
+// Only the name, labels, and sum properties will be filled.
+func queryLastValueInstrument(url string) (*InstrumentData, error) {
+	// Create a sum aggregation InstrumentData struct.
+	instrumentData := InstrumentData{
+		aggregation: "lval",
+	}
+
+	// Retrieve the JSON response from Cortex.
+	json, err := getJSON(url)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retrieve sum from JSON.
+	lastValue := gjson.Get(json, "data.result.0.value.1")
+
+	// Retrieve the name and labels. They are stored in a `metric` JSON object.
+	metric := gjson.Get(json, "data.result.0.metric")
+	name, labels := parseMetric(metric)
+
+	// Set the struct properties.
+	instrumentData.name = name
+	instrumentData.labels = labels
+	instrumentData.value = lastValue.Float()
+
+	return &instrumentData, nil
+}
+
+// queryMinMaxSumCountInstrument queries Cortex for an instrument that uses the
+// Distribution aggregation. It contains the min, max, sum, and count.
+func queryMinMaxSumCountInstrument(url string) (*InstrumentData, error) {
+	// Create a MinMaxSumCount aggregation InstrumentData struct.
+	instrumentData := InstrumentData{
+		aggregation: "mmsc",
+	}
+
+	// Retrieve the JSON response for the sum from Cortex.
+	json, err := getJSON(url)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retrieve sum from JSON.
+	sum := gjson.Get(json, "data.result.0.value.1")
+
+	// Retrieve the name and labels. They are stored in a `metric` JSON object.
+	metric := gjson.Get(json, "data.result.0.metric")
+	name, labels := parseMetric(metric)
+
+	// Set the struct properties.
+	instrumentData.name = name
+	instrumentData.labels = labels
+	instrumentData.value = sum.Float()
+
+	// Retrieve the JSON response for the min from Cortex.
+	json, err = getJSON(url + "_min")
+	if err != nil {
+		return nil, err
+	}
+	// Retrieve min from JSON.
+	min := gjson.Get(json, "data.result.0.value.1")
+	instrumentData.min = min.Int()
+
+	// Retrieve the JSON response for the min from Cortex.
+	json, err = getJSON(url + "_max")
+	if err != nil {
+		return nil, err
+	}
+	// Retrieve min from JSON.
+	max := gjson.Get(json, "data.result.0.value.1")
+	instrumentData.max = max.Int()
+
+	// Retrieve the JSON response for the count from Cortex.
+	json, err = getJSON(url + "_count")
+	if err != nil {
+		return nil, err
+	}
+	// Retrieve count from JSON.
+	count := gjson.Get(json, "data.result.0.value.1")
+	instrumentData.count = count.Int()
+
+	return &instrumentData, nil
+}
+
+// queryDistributionInstrument queries Cortex for an instrument that uses the Distribution
+// aggregation. It contains the min, max, sum, count, as well as the different quantiles.
 func queryDistributionInstrument(url string) (*InstrumentData, error) {
 	// Create a sum aggregation InstrumentData struct.
 	instrumentData := InstrumentData{
@@ -292,60 +348,6 @@ func queryDistributionInstrument(url string) (*InstrumentData, error) {
 		return true
 	})
 	instrumentData.quantiles = quantiles
-
-	return &instrumentData, nil
-}
-
-func queryMinMaxSumCountInstrument(url string) (*InstrumentData, error) {
-	// Create a MinMaxSumCount aggregation InstrumentData struct.
-	instrumentData := InstrumentData{
-		aggregation: "mmsc",
-	}
-
-	// Retrieve the JSON response for the sum from Cortex.
-	json, err := getJSON(url)
-	if err != nil {
-		return nil, err
-	}
-
-	// Retrieve sum from JSON.
-	sum := gjson.Get(json, "data.result.0.value.1")
-
-	// Retrieve the name and labels. They are stored in a `metric` JSON object.
-	metric := gjson.Get(json, "data.result.0.metric")
-	name, labels := parseMetric(metric)
-
-	// Set the struct properties.
-	instrumentData.name = name
-	instrumentData.labels = labels
-	instrumentData.value = sum.Float()
-
-	// Retrieve the JSON response for the min from Cortex.
-	json, err = getJSON(url + "_min")
-	if err != nil {
-		return nil, err
-	}
-	// Retrieve min from JSON.
-	min := gjson.Get(json, "data.result.0.value.1")
-	instrumentData.min = min.Int()
-
-	// Retrieve the JSON response for the min from Cortex.
-	json, err = getJSON(url + "_max")
-	if err != nil {
-		return nil, err
-	}
-	// Retrieve min from JSON.
-	max := gjson.Get(json, "data.result.0.value.1")
-	instrumentData.max = max.Int()
-
-	// Retrieve the JSON response for the count from Cortex.
-	json, err = getJSON(url + "_count")
-	if err != nil {
-		return nil, err
-	}
-	// Retrieve count from JSON.
-	count := gjson.Get(json, "data.result.0.value.1")
-	instrumentData.count = count.Int()
 
 	return &instrumentData, nil
 }

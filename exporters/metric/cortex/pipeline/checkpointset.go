@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This file is the same as `metrictest.go` in the OTel-Go SDK other than the addition of
+// custom timestamps. The original package created new Records with the default timestamp
+// from time.Time{}, which caused errors in Cortex.
+
 package main
 
 import (

@@ -19,35 +19,35 @@ var pipelineTwoOutputFile string = "data/pipelineTwoResults.csv"
 func main() {
 	// Start a timer to measure how long pipeline test takes.
 	start := time.Now()
-	fmt.Printf("Starting pipeline test!\n\n")
-
-	// // Export to Cortex.
-	// fmt.Printf("Exporting data to Cortex!\n")
-	// runPipelineOne()
-
-	// // Query Cortex and write results to `pipelineOneOutputFile`.
-	// fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
-	// storePipelineOneResults()
-
-	// // Validate that the results file and the answers file are the same.
-	// fmt.Printf("\nComparing the results and answers files!\n")
-	// validatePipelineOne()
+	fmt.Printf("[P1] Starting pipeline one test!\n\n")
 
 	// Export to Cortex.
-	fmt.Printf("Exporting data to Cortex!\n")
+	fmt.Printf("[P1] Exporting data to Cortex!\n")
+	runPipelineOne()
+
+	// Query Cortex and write results to `pipelineOneOutputFile`.
+	fmt.Printf("\n[P1] Querying data from Cortex and writing results to disk!\n")
+	storePipelineOneResults()
+
+	// Validate that the results file and the answers file are the same.
+	fmt.Printf("\n[P1] Comparing the results and answers files!\n")
+	validatePipelineOne()
+
+	// Export to Cortex.
+	fmt.Printf("[P2] Exporting data to Cortex!\n")
 	runPipelineTwo()
 
 	// Query Cortex and write results to `pipelineOneOutputFile`.
-	fmt.Printf("\nQuerying data from Cortex and writing results to disk!\n")
+	fmt.Printf("\n[P2] Querying data from Cortex and writing results to disk!\n")
 	storePipelineTwoResults()
 
 	// Validate that the results file and the answers file are the same.
-	fmt.Printf("\nComparing the results and answers files!\n")
+	fmt.Printf("\n[P2] Comparing the results and answers files!\n")
 	validatePipelineTwo()
 
 	// Print out elapsed time.
 	elapsed := time.Since(start)
-	fmt.Printf("\n[Success] Completed pipeline test!\n")
+	fmt.Printf("\n[Success] Completed pipeline tests!\n")
 	fmt.Printf("Elapsed Time: %v\n", elapsed)
 }
 

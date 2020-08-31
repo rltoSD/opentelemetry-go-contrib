@@ -24,6 +24,61 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/sum"
 )
 
+// runPipelineTwo runs a pipeline that creates checkpoint sets and exports
+// them to Cortex by calling the exporter's Export() method.
+func runPipelineTwo() {
+	// Create exporter.
+	exporter := initPipelineTwo()
+
+	// Get context.
+	ctx := context.Background()
+
+	// Create CSV reader.
+	reader := initPipelineTwoCSVReader()
+
+	// Iterate through each line of data file.
+	for i := 1; i > 0; i++ {
+		// Retrieve the next line from the CSV file.
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Retrieve necessary data for making a checkpoint set.
+		aggType, values, name, labels, err := parsePipelineTwoRecord(record)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Create a checkpoint set based on the data.
+		var checkpointSet *CheckpointSet
+		switch aggType {
+		case "sum":
+			checkpointSet = buildCheckpointSet("sum", name, labels, values, metric.UpDownCounterKind)
+		case "lval":
+			checkpointSet = buildCheckpointSet("lval", name, labels, values, metric.ValueObserverKind)
+		case "mmsc":
+			checkpointSet = buildCheckpointSet("mmsc", name, labels, values, metric.ValueRecorderKind)
+		case "dist":
+			checkpointSet = buildCheckpointSet("dist", name, labels, values, metric.ValueRecorderKind)
+		case "hist":
+			checkpointSet = buildCheckpointSet("hist", name, labels, values, metric.ValueRecorderKind)
+		}
+
+		// Export to Cortex.
+		err = exporter.Export(ctx, checkpointSet)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("[P2 Success] Parsed %v\n", record)
+	}
+}
+
+// parsePipelineTwoRecord parses a line from a csv file and extracts the aggregation type,
+// the values to update an instrument with, and the mock instrument's name / labels.
 func parsePipelineTwoRecord(record []string) (string, []int64, string, []label.KeyValue, error) {
 	// Aggregation type is the first field.
 	aggType := record[0]
@@ -60,60 +115,14 @@ func parsePipelineTwoRecord(record []string) (string, []int64, string, []label.K
 	return aggType, values, name, labels, nil
 }
 
-func runPipelineTwo() {
-	// Create exporter.
-	exporter := initPipelineTwo()
-
-	// Get context.
-	ctx := context.Background()
-
-	// Create CSV reader.
-	reader := initPipelineTwoCSVReader()
-
-	// Iterate through each line of data file.
-	for i := 1; i > 0; i++ {
-		// Retrieve the next line from the CSV file.
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		aggType, values, name, labels, err := parsePipelineTwoRecord(record)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var checkpointSet *CheckpointSet
-		switch aggType {
-		case "sum":
-			checkpointSet = buildCheckpointSet("sum", name, labels, values, metric.UpDownCounterKind)
-		case "lval":
-			checkpointSet = buildCheckpointSet("lval", name, labels, values, metric.ValueObserverKind)
-		case "mmsc":
-			checkpointSet = buildCheckpointSet("mmsc", name, labels, values, metric.ValueRecorderKind)
-		case "dist":
-			checkpointSet = buildCheckpointSet("dist", name, labels, values, metric.ValueRecorderKind)
-		case "hist":
-			checkpointSet = buildCheckpointSet("hist", name, labels, values, metric.ValueRecorderKind)
-		}
-
-		// Export to Cortex.
-		err = exporter.Export(ctx, checkpointSet)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("[Success] Parsed %v\n", record)
-	}
-}
-
+// buildCheckpointSet creates a new checkpoint set based on the aggregation type and adds
+// different values to it.
 func buildCheckpointSet(aggType string, name string, labels []label.KeyValue, values []int64, kind metric.Kind) *CheckpointSet {
-	// Create sum checkpoint set with resource and descriptor
+	// Create sum checkpoint set with resource and descriptor.
 	checkpointSet := NewCheckpointSet(nil)
 	descriptor := metric.NewDescriptor(name, kind, metric.Int64NumberKind)
 
-	// Create aggregation, add value, and update checkpointset
+	// Create aggregation, add value, and update checkpoint set.
 	var aggregation export.Aggregator
 	var checkpoint export.Aggregator
 	switch aggType {
@@ -129,40 +138,22 @@ func buildCheckpointSet(aggType string, name string, labels []label.KeyValue, va
 		boundaries := []float64{-25, 0, 25}
 		aggregation, checkpoint = Unslice2(histogram.New(2, &descriptor, boundaries))
 	}
+
+	// Add different values to the checkpoint set.
 	for _, value := range values {
 		checkedUpdate(aggregation, metric.NewInt64Number(value), &descriptor)
 	}
-
 	err := aggregation.SynchronizedMove(checkpoint, &descriptor)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	checkpointSet.Add(time.Now(), &descriptor, checkpoint, labels...)
 
 	return checkpointSet
 }
 
-// // fmt.Println(time.Time{}.UnixNano() / int64(time.Millisecond))
-// // fmt.Println(time.Time{}.Unix())
-// // fmt.Println(strconv.Itoa(int(time.Now().Unix())))
-// // fmt.Println(strconv.Itoa(int(time.Time{}.Unix())))
-
-// u, err := url.Parse("http://0.0.0.0:9009/api/prom/api/v1/query_range")
-// if err != nil {
-// 	log.Println(err)
-// 	return
-// }
-// q := u.Query()
-// q.Add("query", "pipeline_two_test")
-// q.Add("start", strconv.Itoa(int(time.Time{}.Unix())))
-// q.Add("end", strconv.Itoa(int(time.Now().Unix())))
-// q.Add("step", "999999999")
-// u.RawQuery = q.Encode()
-// fmt.Println("url: ", u)
-// // fmt.Println(time.Now().Unix())
-
-// Performs the same range test the SDK does on behalf of the aggregator.
+// Performs the same range test the SDK does on behalf of the aggregator. This function is
+// the same as CheckedUpdate() from the SDK, but it removes the testing.T pointer.
 func checkedUpdate(agg export.Aggregator, number metric.Number, descriptor *metric.Descriptor) {
 	ctx := context.Background()
 
@@ -179,6 +170,8 @@ func checkedUpdate(agg export.Aggregator, number metric.Number, descriptor *metr
 	}
 }
 
+// initPipelineTwoCSVReader creates a new reader for reading and parsing csv files. It
+// makes sure that each line has 3 records.
 func initPipelineTwoCSVReader() *csv.Reader {
 	// Open the csv file to read from.
 	data, err := os.Open(pipelineTwoFilename)
@@ -194,20 +187,21 @@ func initPipelineTwoCSVReader() *csv.Reader {
 	return reader
 }
 
+// initPipelineTwo creates a new Exporter for exporting metrics data to Cortex.
 func initPipelineTwo() *cortex.Exporter {
 	// Read config YAML file to generate a Config struct.
 	config, err := utils.NewConfig("config.yml")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("[Success] Created Config struct")
+	fmt.Println("[P2 Success] Created Config struct")
 
 	// Create an exporter.
 	exporter, err := cortex.NewRawExporter(*config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("[Success] Created New Cortex Exporter!")
+	fmt.Println("[P2 Success] Created New Cortex Exporter!")
 
 	return exporter
 }
