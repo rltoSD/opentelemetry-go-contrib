@@ -52,27 +52,38 @@ func main() {
 	ctx := context.Background()
 
 	recorder := metric.Must(meter).NewInt64ValueRecorder(
-		"pipeline.valuerecorder",
+		"demo9.vrec",
 		metric.WithDescription("Records values"),
 	)
 
 	counter := metric.Must(meter).NewInt64Counter(
-		"pipeline.counter",
+		"demo9.ctr",
 		metric.WithDescription("Counts things"),
 	)
-	fmt.Println("Success: Created Int64ValueRecorder and Int64Counter instruments")
+
+	udctr := metric.Must(meter).NewInt64UpDownCounter(
+		"demo9.udctr",
+		metric.WithDescription("Counts things"),
+	)
+	fmt.Println("Success: Created instruments")
 
 	// Record random values to the instruments in a loop
 	fmt.Println("Starting to write data to the instruments")
 	seed := rand.NewSource(time.Now().UnixNano())
 	random := rand.New(seed)
-	for {
-		time.Sleep(5 * time.Second)
-		randomValue := random.Intn(100)
-		value := int64(randomValue * 10)
+	for i := 1; i > 0; i++ {
+		time.Sleep(1 * time.Second)
+		value := int64(i * 2)
+		randomValue := int64(random.Intn(10*i) - 5*i)
+		ctrval := int64(0)
+		if i%10 == 0 {
+			ctrval = int64(50 * i)
+		}
 		recorder.Record(ctx, value, label.String("key", "value"))
-		counter.Add(ctx, int64(randomValue), label.String("key", "value"))
-		fmt.Printf("Adding %d to counter and recording %d in recorder\n", randomValue, value)
+		counter.Add(ctx, ctrval, label.String("key", "value"))
+		udctr.Add(ctx, randomValue, label.String("key", "value"))
+
+		fmt.Printf("%d. Adding %v to counter, %v to upDownCounter, recording %v in recorder\n", i, ctrval, randomValue, value)
 	}
 
 }
