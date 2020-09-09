@@ -23,6 +23,8 @@ import (
 
 	"go.opentelemetry.io/otel/codes"
 
+	otelcontrib "go.opentelemetry.io/contrib"
+
 	otelglobal "go.opentelemetry.io/otel/api/global"
 	otelpropagation "go.opentelemetry.io/otel/api/propagation"
 	oteltrace "go.opentelemetry.io/otel/api/trace"
@@ -39,18 +41,22 @@ const (
 // The service parameter should describe the name of the (virtual)
 // server handling the request.
 func Middleware(service string, opts ...Option) gin.HandlerFunc {
-	cfg := Config{}
+	cfg := config{}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	if cfg.Tracer == nil {
-		cfg.Tracer = otelglobal.Tracer(tracerName)
+	if cfg.TracerProvider == nil {
+		cfg.TracerProvider = otelglobal.TraceProvider()
 	}
+	tracer := cfg.TracerProvider.Tracer(
+		tracerName,
+		oteltrace.WithInstrumentationVersion(otelcontrib.SemVersion()),
+	)
 	if cfg.Propagators == nil {
 		cfg.Propagators = otelglobal.Propagators()
 	}
 	return func(c *gin.Context) {
-		c.Set(tracerKey, cfg.Tracer)
+		c.Set(tracerKey, tracer)
 		savedCtx := c.Request.Context()
 		defer func() {
 			c.Request = c.Request.WithContext(savedCtx)
@@ -66,7 +72,7 @@ func Middleware(service string, opts ...Option) gin.HandlerFunc {
 		if spanName == "" {
 			spanName = fmt.Sprintf("HTTP %s route not found", c.Request.Method)
 		}
-		ctx, span := cfg.Tracer.Start(ctx, spanName, opts...)
+		ctx, span := tracer.Start(ctx, spanName, opts...)
 		defer span.End()
 
 		// pass the span through the request context
@@ -97,7 +103,10 @@ func HTML(c *gin.Context, code int, name string, obj interface{}) {
 		tracer, ok = tracerInterface.(oteltrace.Tracer)
 	}
 	if !ok {
-		tracer = otelglobal.Tracer(tracerName)
+		tracer = otelglobal.TraceProvider().Tracer(
+			tracerName,
+			oteltrace.WithInstrumentationVersion(otelcontrib.SemVersion()),
+		)
 	}
 	savedContext := c.Request.Context()
 	defer func() {

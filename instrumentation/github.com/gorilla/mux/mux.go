@@ -21,6 +21,8 @@ import (
 
 	"github.com/gorilla/mux"
 
+	otelcontrib "go.opentelemetry.io/contrib"
+
 	otelglobal "go.opentelemetry.io/otel/api/global"
 	otelpropagation "go.opentelemetry.io/otel/api/propagation"
 	oteltrace "go.opentelemetry.io/otel/api/trace"
@@ -35,20 +37,24 @@ const (
 // requests.  The service parameter should describe the name of the
 // (virtual) server handling the request.
 func Middleware(service string, opts ...Option) mux.MiddlewareFunc {
-	cfg := Config{}
+	cfg := config{}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	if cfg.Tracer == nil {
-		cfg.Tracer = otelglobal.Tracer(tracerName)
+	if cfg.TracerProvider == nil {
+		cfg.TracerProvider = otelglobal.TraceProvider()
 	}
+	tracer := cfg.TracerProvider.Tracer(
+		tracerName,
+		oteltrace.WithInstrumentationVersion(otelcontrib.SemVersion()),
+	)
 	if cfg.Propagators == nil {
 		cfg.Propagators = otelglobal.Propagators()
 	}
 	return func(handler http.Handler) http.Handler {
 		return traceware{
 			service:     service,
-			tracer:      cfg.Tracer,
+			tracer:      tracer,
 			propagators: cfg.Propagators,
 			handler:     handler,
 		}

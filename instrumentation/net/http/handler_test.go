@@ -43,19 +43,22 @@ func assertMetricLabels(t *testing.T, expectedLabels []label.KeyValue, measureme
 func TestHandlerBasics(t *testing.T) {
 	rr := httptest.NewRecorder()
 
-	tracer := mocktrace.Tracer{}
-	meterimpl, meter := mockmeter.NewMeter()
+	tracerProvider, tracer := mocktrace.NewProviderAndTracer(instrumentationName)
+	meterimpl, meterProvider := mockmeter.NewProvider()
 
 	operation := "test_handler"
 
 	h := NewHandler(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l, _ := LabelerFromContext(r.Context())
+			l.Add(label.String("test", "label"))
+
 			if _, err := io.WriteString(w, "hello world"); err != nil {
 				t.Fatal(err)
 			}
 		}), operation,
-		WithTracer(&tracer),
-		WithMeter(meter),
+		WithTracerProvider(tracerProvider),
+		WithMeterProvider(meterProvider),
 	)
 
 	r, err := http.NewRequest(http.MethodGet, "http://localhost/", strings.NewReader("foo"))
@@ -73,6 +76,7 @@ func TestHandlerBasics(t *testing.T) {
 		semconv.HTTPSchemeHTTP,
 		semconv.HTTPHostKey.String(r.Host),
 		semconv.HTTPFlavorKey.String(fmt.Sprintf("1.%d", r.ProtoMinor)),
+		label.String("test", "label"),
 	}
 
 	assertMetricLabels(t, labelsToVerify, meterimpl.MeasurementBatches)
@@ -98,7 +102,7 @@ func TestHandlerBasics(t *testing.T) {
 func TestHandlerNoWrite(t *testing.T) {
 	rr := httptest.NewRecorder()
 
-	tracer := mocktrace.Tracer{}
+	tracerProvider, tracer := mocktrace.NewProviderAndTracer(instrumentationName)
 
 	operation := "test_handler"
 	var span trace.Span
@@ -107,7 +111,7 @@ func TestHandlerNoWrite(t *testing.T) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			span = trace.SpanFromContext(r.Context())
 		}), operation,
-		WithTracer(&tracer),
+		WithTracerProvider(tracerProvider),
 	)
 
 	r, err := http.NewRequest(http.MethodGet, "http://localhost/", nil)
@@ -137,7 +141,7 @@ func TestHandlerNoWrite(t *testing.T) {
 func TestResponseWriterOptionalInterfaces(t *testing.T) {
 	rr := httptest.NewRecorder()
 
-	tracer := mocktrace.Tracer{}
+	tracerProvider, _ := mocktrace.NewProviderAndTracer(instrumentationName)
 
 	// ResponseRecorder implements the Flusher interface. Make sure the
 	// wrapped ResponseWriter passed to the handler still implements
@@ -151,7 +155,7 @@ func TestResponseWriterOptionalInterfaces(t *testing.T) {
 				t.Fatal(err)
 			}
 		}), "test_handler",
-		WithTracer(&tracer))
+		WithTracerProvider(tracerProvider))
 
 	r, err := http.NewRequest(http.MethodGet, "http://localhost/", nil)
 	if err != nil {
