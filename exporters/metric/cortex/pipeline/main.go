@@ -13,21 +13,21 @@ var pipelineTwoFilename string = "data/PrometheusDataSecond.csv"
 var pipelineTwoOutputFile string = "data/pipelineTwoResults.csv"
 
 func main() {
-	// // Run and validate pipeline one in-memory.
-	// runPipelineOneInMemory(
-	// 	"data/PrometheusDataFirst.csv",
-	// 	"data/PrometheusAnswersFirst.csv",
-	// 	1000,
-	// 	5000,
-	// )
-
 	// Run and validate pipeline one in-memory.
-	runPipelineTwoInMemory(
-		"data/PrometheusDataSecond.csv",
-		"data/PrometheusAnswersSecond.csv",
-		100,
+	runPipelineOneInMemory(
+		"data/PrometheusDataFirst.csv",
+		"data/PrometheusAnswersFirst.csv",
 		1000,
+		5000,
 	)
+
+	// Run and validate pipeline two in-memory.
+	// runPipelineTwoInMemory(
+	// 	"data/PrometheusDataSecond.csv",
+	// 	"data/PrometheusAnswersSecond.csv",
+	// 	500,
+	// 	2500,
+	// )
 
 	// // Start a timer to measure how long pipeline test takes.
 	// start := time.Now()
@@ -65,7 +65,6 @@ func main() {
 	// if p2Valid {
 	// 	fmt.Println("[Success] Pipeline Two Validation Succeeded.")
 	// }
-
 }
 
 // validatePipelineOne opens and compares the results and answers file for pipeline one.
