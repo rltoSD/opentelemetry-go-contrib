@@ -48,19 +48,29 @@ This pipeline test consists of three components:
 The first step is to install and start an instance of Cortex. The Go Cortex Exporter's
 purpose is to export metrics data to Cortex. Therefore, there must be a running instance
 of Cortex to accept the exported data. Cortex can be installed and started with the shell
-commands below. This pipeline test uses one of Cortex's example configuration files.
+commands below. This pipeline test uses one of Cortex's example configuration files. This
+configuration file has a ingestion limit of 25000, which is too low for larger data files.
+Use the cortexConfig.yml file in repo to run larger tests.
 
 ```shell
 git clone https://github.com/cortexproject/cortex.git
 cd cortex
 go build ./cmd/cortex
+
+# For smaller tests. Default config file from documentation.
 ./cortex -config.file=./docs/configuration/single-process-config.yaml
+
+# For larger tests. Very similar to default file above, but with larger limits.
+./cortex -config.file=<cortexConfig.yml>
 ```
 
 ### Step 2 - Install, Start, and Setup Grafana
 The second step is to install and start Grafana, an open-source analytics platform that
 will be used to visualize the exported data in Cortex. Grafana offers an easy way to query
 and graph the data and is a clear way to show that the exporter is working as intended.
+This step is not required as the tests will still run; Grafana provides another way to
+check the exported data.
+
 Use the following shell command to install and run a docker image with Grafana.
 
 ```shell
