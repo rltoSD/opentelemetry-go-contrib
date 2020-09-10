@@ -10,7 +10,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/cheggaaa/pb/v3"
 	"github.com/tidwall/gjson"
 )
 
@@ -30,16 +32,16 @@ type InstrumentData struct {
 // storePipelineOneResults iterates through a generated data file, queries Cortex for each
 // line in the file, converts the response to a csv record, and then writes that record to
 // a new file.
-func storePipelineOneResults() error {
+func storePipelineOneResults(inputFile string, resultsFile string) error {
 	// Open a file to write the results to.
-	file, err := os.Create(pipelineOneOutputFile)
+	file, err := os.Create(resultsFile)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
 	// Open the generated data csv file to read from.
-	data, err := os.Open(pipelineOneFilename)
+	data, err := os.Open(inputFile)
 	if err != nil {
 		return err
 	}
@@ -529,4 +531,56 @@ func convertToRecord(data *InstrumentData) string {
 	}
 
 	return record
+}
+
+func queryBatch(resultMap map[string]string) ([]string, bool) {
+	bar := pb.Full.Start(len(resultMap))
+	var mismatches []string
+	valid := true
+	time.Sleep(1 * time.Second)
+	for name, expectedRecord := range resultMap {
+		// Make a Cortex instant query for the instrument using the name and store the
+		// response as a InstrumentData struct.
+		var instrumentData *InstrumentData
+		var err error
+		url := "http://0.0.0.0:9009/api/prom/api/v1/query?query=" + name
+		if strings.Contains(name, "_sum") {
+			instrumentData, err = querySumInstrument(url)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if strings.Contains(name, "_hist") {
+			instrumentData, err = queryHistogramInstrument(url)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if strings.Contains(name, "_dist") {
+			instrumentData, err = queryDistributionInstrument(url)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if strings.Contains(name, "_lval") {
+			instrumentData, err = queryLastValueInstrument(url)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else if strings.Contains(name, "_mmsc") {
+			instrumentData, err = queryMinMaxSumCountInstrument(url)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		// Convert the InstrumentData struct into a csv record in the same format as the
+		// generated answers file.
+		outputRecord := convertToRecord(instrumentData)
+		if outputRecord != expectedRecord {
+			valid = false
+			mismatchStr := fmt.Sprintf("[P1 Failure] Incorrect result for %v \n Expected: %v\n Received %v\n\n", name, expectedRecord, outputRecord)
+			mismatches = append(mismatches, mismatchStr)
+		}
+		bar.Increment()
+	}
+	bar.Finish()
+	return mismatches, valid
 }
