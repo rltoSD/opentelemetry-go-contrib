@@ -86,6 +86,6 @@ project README for more information on how to setup and use Grafana.
 
 ### Step 3 - Run Pipeline Test
 The last step is to run the pipeline test in `pipeline.go`. Modify `main.go` to select
-which tests to run and then run the tests with either:
+which tests to run and then run the tests with:
 
-`go run pipeline.go` OR `go test`
+`go build` followed by `./pipeline`

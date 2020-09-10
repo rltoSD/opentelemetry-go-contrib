@@ -13,15 +13,15 @@ var pipelineTwoFilename string = "data/PrometheusDataSecond.csv"
 var pipelineTwoOutputFile string = "data/pipelineTwoResults.csv"
 
 func main() {
-	// Run and validate pipeline one in-memory.
+	// // Run and validate pipeline one in-memory.
 	runPipelineOneInMemory(
 		"data/PrometheusDataFirst.csv",
 		"data/PrometheusAnswersFirst.csv",
-		1000,
-		5000,
+		500,
+		2500,
 	)
 
-	// Run and validate pipeline two in-memory.
+	// // Run and validate pipeline two in-memory.
 	// runPipelineTwoInMemory(
 	// 	"data/PrometheusDataSecond.csv",
 	// 	"data/PrometheusAnswersSecond.csv",

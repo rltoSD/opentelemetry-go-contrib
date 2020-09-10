@@ -551,7 +551,7 @@ func queryBatch(resultMap map[string]string) ([]string, bool) {
 	bar := pb.Full.Start(len(resultMap))
 	var mismatches []string
 	valid := true
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	for name, expectedRecord := range resultMap {
 		// Make a Cortex instant query for the instrument using the name and store the
 		// response as a InstrumentData struct.
