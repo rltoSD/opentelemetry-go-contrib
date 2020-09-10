@@ -32,7 +32,10 @@ type InstrumentData struct {
 // storePipelineOneResults iterates through a generated data file, queries Cortex for each
 // line in the file, converts the response to a csv record, and then writes that record to
 // a new file.
-func storePipelineOneResults(inputFile string, resultsFile string) error {
+func storePipelineOneResults(inputFile string, resultsFile string, numRecords int) error {
+	// Create progress bar.
+	bar := pb.Full.Start(numRecords)
+
 	// Open a file to write the results to.
 	file, err := os.Create(resultsFile)
 	if err != nil {
@@ -87,23 +90,30 @@ func storePipelineOneResults(inputFile string, resultsFile string) error {
 
 		// Write the record to the file.
 		file.WriteString(outputRecord + "\n")
+
+		// Update progress bar.
+		bar.Increment()
 	}
+	bar.Finish()
 	return nil
 }
 
 // storePipelineTwoResults iterates through a generated data file, queries Cortex for each
 // line in the file, converts the response to a csv record, and then writes that record to
 // a new file.
-func storePipelineTwoResults() error {
+func storePipelineTwoResults(inputFile string, resultsFile string, numRecords int) error {
+	// Create progress bar.
+	bar := pb.Full.Start(numRecords)
+
 	// Open a file to write the results to.
-	file, err := os.Create(pipelineTwoOutputFile)
+	file, err := os.Create(resultsFile)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
 	// Open the generated data csv file to read from.
-	data, err := os.Open(pipelineTwoFilename)
+	data, err := os.Open(inputFile)
 	if err != nil {
 		return err
 	}
@@ -165,7 +175,11 @@ func storePipelineTwoResults() error {
 
 		// Write the record to the file.
 		file.WriteString(outputRecord + "\n")
+
+		// Update progress bar.
+		bar.Increment()
 	}
+	bar.Finish()
 	return nil
 }
 

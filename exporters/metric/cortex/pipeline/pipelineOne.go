@@ -209,7 +209,7 @@ func runPipelineOneInMemory(
 
 // runPipelineOne runs a pipeline that records values to various instruments and exports
 // metrics data to Cortex.
-func runPipelineOne(filename string, delay time.Duration, numRecords int) {
+func runPipelineOne(filename string, numRecords int) {
 	// Creates a push controller that calls Export() every 2 seconds.
 	pusher, err := initPipeline(100 * time.Millisecond)
 	if err != nil {
@@ -339,9 +339,6 @@ func runPipelineOne(filename string, delay time.Duration, numRecords int) {
 		}
 
 		fmt.Printf("%v. [P1] Parsed %v\n", i, record)
-
-		// Sleep for a while so the push controller won't push too much data at once.
-		time.Sleep(delay)
 	}
 }
 

@@ -73,7 +73,7 @@ func runPipelineTwo() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("[P2 Success] Parsed %v\n", record)
+		fmt.Printf("%v. [P2] Parsed %v\n", i, record)
 	}
 }
 
