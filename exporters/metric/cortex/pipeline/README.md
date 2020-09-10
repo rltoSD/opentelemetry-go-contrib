@@ -80,10 +80,12 @@ docker run --rm -d --name=grafana -p 3000:3000 grafana/grafana
 A data source must be set to Cortex in order for the data to show up in Grafana. Go to the
 data sources section in Grafana and select the Prometheus option. Add
 `http://host.docker.internal:9009/api/prom` as the URL and clock save and exit. A green
-box should pop up stating that the data source is valid.
+box should pop up stating that the data source is valid. The username / password is
+admin/admin. There may be a password reset screen which can be ignored. See the example
+project README for more information on how to setup and use Grafana.
 
 ### Step 3 - Run Pipeline Test
-The last step is to run the pipeline test in `pipeline.go`. The test can be run with
-either:
+The last step is to run the pipeline test in `pipeline.go`. Modify `main.go` to select
+which tests to run and then run the tests with either:
 
 `go run pipeline.go` OR `go test`
