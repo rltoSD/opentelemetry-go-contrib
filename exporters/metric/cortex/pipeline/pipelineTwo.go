@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/csv"
 	"fmt"
@@ -24,8 +25,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/aggregator/sum"
 )
 
-// runPipelineTwo runs a pipeline that creates checkpoint sets and exports
-// them to Cortex by calling the exporter's Export() method.
+// runPipelineTwo runs a pipeline that creates checkpoint sets and exports them to Cortex
+// by calling the exporter's Export() method.
 func runPipelineTwo() {
 	// Create exporter.
 	exporter := initPipelineTwo()
@@ -75,6 +76,108 @@ func runPipelineTwo() {
 		}
 		fmt.Printf("%v. [P2] Parsed %v\n", i, record)
 	}
+}
+
+// runPipelineTwoInMemory runs a pipeline that creates checkpoint sets and exports them to
+// Cortex by calling the exporter's Export() method. It does not write anything to a file
+// and instead compares records in memory.
+func runPipelineTwoInMemory(
+	inputFile string, answerFile string, batchSize int, numRecords int,
+) {
+	// Start a timer to measure how long the test takes.
+	start := time.Now()
+	fmt.Printf("[P2] Starting pipeline two test!\n\n")
+
+	// Create exporter.
+	exporter := initPipelineTwo()
+
+	// Get context.
+	ctx := context.Background()
+
+	// Create CSV reader.
+	reader := initPipelineTwoCSVReader()
+
+	// Open answers file to check expected results.
+	file, err := os.Open(answerFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+
+	// Create a new map for storing expected results and print a new line for formatting.
+	resultMap := make(map[string]string, batchSize)
+	fmt.Println()
+
+	// Iterate through each line of data file.
+	for i := 1; i > 0; i++ {
+		// Query each instrument in a batch.
+		if len(resultMap)%batchSize == 0 && i != 1 {
+			start := i - (batchSize + 1)
+			end := i - 2
+			fmt.Printf("\n[P2] Validating batch for lines %v to %v\n", start, end)
+
+			// Check if there are any records were incorrect. Clear the map afterwards.
+			if mismatches, valid := queryBatch(resultMap); !valid {
+				fmt.Printf("[P2 Error] Found %v Mismatches in lines %v to %v\n", len(mismatches), start, end)
+				for _, mismatch := range mismatches {
+					fmt.Print(mismatch)
+				}
+				resultMap = make(map[string]string, batchSize)
+				break
+			}
+			resultMap = make(map[string]string, batchSize)
+			fmt.Printf("[P2] Validated batch for lines %v to %v\n\n", start, end)
+		}
+
+		// Retrieve the next line from the CSV file.
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Retrieve necessary data for making a checkpoint set.
+		aggType, values, name, labels, err := parsePipelineTwoRecord(record)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Create a checkpoint set based on the data.
+		var checkpointSet *CheckpointSet
+		switch aggType {
+		case "sum":
+			checkpointSet = buildCheckpointSet("sum", name, labels, values, metric.UpDownCounterKind)
+		case "lval":
+			checkpointSet = buildCheckpointSet("lval", name, labels, values, metric.ValueObserverKind)
+		case "mmsc":
+			checkpointSet = buildCheckpointSet("mmsc", name, labels, values, metric.ValueRecorderKind)
+		case "dist":
+			checkpointSet = buildCheckpointSet("dist", name, labels, values, metric.ValueRecorderKind)
+		case "hist":
+			checkpointSet = buildCheckpointSet("hist", name, labels, values, metric.ValueRecorderKind)
+		}
+
+		// Export to Cortex.
+		err = exporter.Export(ctx, checkpointSet)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// fmt.Printf("%v. [P2] Parsed %v\n", i, record)
+
+		// Get the next line in the answers file.
+		scanner.Scan()
+
+		// Map the answer record to the instrument name.
+		resultMap[name] = scanner.Text()
+		elapsed := time.Since(start)
+		fmt.Printf("[P2] Parsed %v/%v records. Elapsed time: %v\r", i, numRecords, elapsed)
+	}
+	// Print out elapsed time.
+	elapsed := time.Since(start)
+	fmt.Printf("[P2] Completed pipeline two test in %v!\n", elapsed)
 }
 
 // parsePipelineTwoRecord parses a line from a csv file and extracts the aggregation type,

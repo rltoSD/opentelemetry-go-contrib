@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"time"
 )
 
 // Settings.
@@ -22,42 +21,50 @@ func main() {
 	// 	5000,
 	// )
 
-	// Start a timer to measure how long pipeline test takes.
-	start := time.Now()
+	// Run and validate pipeline one in-memory.
+	runPipelineTwoInMemory(
+		"data/PrometheusDataSecond.csv",
+		"data/PrometheusAnswersSecond.csv",
+		100,
+		1000,
+	)
 
-	// Run PipelineOne test.
-	fmt.Printf("[P1] Starting pipeline one test!\n\n")
-	fmt.Printf("[P1] Exporting data to Cortex!\n")
-	runPipelineOne("data/PrometheusDataFirst.csv", 1000)
+	// // Start a timer to measure how long pipeline test takes.
+	// start := time.Now()
 
-	fmt.Printf("\n[P1] Querying data from Cortex and writing results to disk!\n")
-	storePipelineOneResults("data/PrometheusDataFirst.csv", "data/pipelineOneResults.csv", 1000)
+	// // Run PipelineOne test.
+	// fmt.Printf("[P1] Starting pipeline one test!\n\n")
+	// fmt.Printf("[P1] Exporting data to Cortex!\n")
+	// runPipelineOne("data/PrometheusDataFirst.csv", 1000)
 
-	fmt.Printf("\n[P1] Comparing the results and answers files!\n")
-	p1Valid := validatePipelineOne()
+	// fmt.Printf("\n[P1] Querying data from Cortex and writing results to disk!\n")
+	// storePipelineOneResults("data/PrometheusDataFirst.csv", "data/pipelineOneResults.csv", 1000)
 
-	// Run PipelineTwo test.
-	fmt.Printf("[P2] Starting pipeline two test!\n\n")
-	fmt.Printf("[P2] Exporting data to Cortex!\n")
-	runPipelineTwo()
+	// fmt.Printf("\n[P1] Comparing the results and answers files!\n")
+	// p1Valid := validatePipelineOne()
 
-	fmt.Printf("\n[P2] Querying data from Cortex and writing results to disk!\n")
-	storePipelineTwoResults("data/PrometheusDataSecond.csv", "data/pipelineTwoResults.csv", 1000)
+	// // Run PipelineTwo test.
+	// fmt.Printf("[P2] Starting pipeline two test!\n\n")
+	// fmt.Printf("[P2] Exporting data to Cortex!\n")
+	// runPipelineTwo()
 
-	fmt.Printf("\n[P2] Comparing the results and answers files!\n")
-	p2Valid := validatePipelineTwo()
+	// fmt.Printf("\n[P2] Querying data from Cortex and writing results to disk!\n")
+	// storePipelineTwoResults("data/PrometheusDataSecond.csv", "data/pipelineTwoResults.csv", 1000)
 
-	// Print out elapsed time.
-	elapsed := time.Since(start)
+	// fmt.Printf("\n[P2] Comparing the results and answers files!\n")
+	// p2Valid := validatePipelineTwo()
 
-	fmt.Printf("\nCompleted pipeline tests!\n")
-	fmt.Printf("Elapsed Time: %v\n", elapsed)
-	if p1Valid {
-		fmt.Println("[Success] Pipeline One Validation Succeeded.")
-	}
-	if p2Valid {
-		fmt.Println("[Success] Pipeline Two Validation Succeeded.")
-	}
+	// // Print out elapsed time.
+	// elapsed := time.Since(start)
+
+	// fmt.Printf("\nCompleted pipeline tests!\n")
+	// fmt.Printf("Elapsed Time: %v\n", elapsed)
+	// if p1Valid {
+	// 	fmt.Println("[Success] Pipeline One Validation Succeeded.")
+	// }
+	// if p2Valid {
+	// 	fmt.Println("[Success] Pipeline Two Validation Succeeded.")
+	// }
 
 }
 
