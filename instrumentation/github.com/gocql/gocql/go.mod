@@ -9,6 +9,6 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/stretchr/testify v1.6.1
 	go.opentelemetry.io/contrib v0.11.0
-	go.opentelemetry.io/otel v0.11.0
-	go.opentelemetry.io/otel/sdk v0.11.0
+	go.opentelemetry.io/otel v0.12.0
+	go.opentelemetry.io/otel/sdk v0.12.0
 )
