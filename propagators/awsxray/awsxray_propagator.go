@@ -27,21 +27,20 @@ const (
 	traceHeaderKey       = "X-Amzn-Trace-Id"
 	traceHeaderDelimiter = ";"
 	kvDelimiter          = "="
-	traceIdKey           = "Root"
+	traceIDKey           = "Root"
 	sampleFlagKey        = "Sampled"
-	parentIdKey          = "Parent"
-	traceIdVersion       = "1"
-	traceIdDelimiter     = "-"
+	parentIDKey          = "Parent"
+	traceIDVersion       = "1"
+	traceIDDelimiter     = "-"
 	isSampled            = "1"
 	notSampled           = "0"
 
 	traceFlagNone           = 0x0
 	traceFlagSampled        = 0x1 << 0
-	traceIdLength           = 35
-	traceIdDelimitterIndex1 = 1
-	traceIdDelimitterIndex2 = 10
-	traceIdFirstPartLength  = 8
-	parentIdLength          = 16
+	traceIDLength           = 35
+	traceIDDelimitterIndex1 = 1
+	traceIDDelimitterIndex2 = 10
+	traceIDFirstPartLength  = 8
 	sampledFlagLength       = 1
 )
 
@@ -57,37 +56,37 @@ var (
 // AWS X-Ray format
 //
 // X-Amzn-Trace-Id: Root={traceId};Parent={parentId};Sampled={samplingFlag}
-type AwsXray struct{}
+type Xray struct{}
 
-var _ otel.TextMapPropagator = &AwsXray{}
+var _ otel.TextMapPropagator = &Xray{}
 
 // Inject injects a context to the carrier following AWS X-Ray format.
-func (awsxray AwsXray) Inject(ctx context.Context, carrier otel.TextMapCarrier) {
+func (awsxray Xray) Inject(ctx context.Context, carrier otel.TextMapCarrier) {
 	sc := trace.SpanFromContext(ctx).SpanContext()
 	headers := []string{}
 	if !sc.TraceID.IsValid() || !sc.SpanID.IsValid() {
 		return
 	}
-	otTraceId := sc.TraceID.String()
-	xrayTraceId := traceIdVersion + traceIdDelimiter + otTraceId[0:traceIdFirstPartLength] +
-		traceIdDelimiter + otTraceId[traceIdFirstPartLength:]
-	parentId := sc.SpanID
+	otTraceID := sc.TraceID.String()
+	xrayTraceID := traceIDVersion + traceIDDelimiter + otTraceID[0:traceIDFirstPartLength] +
+		traceIDDelimiter + otTraceID[traceIDFirstPartLength:]
+	parentID := sc.SpanID
 	samplingFlag := notSampled
 	if sc.TraceFlags == traceFlagSampled {
 		samplingFlag = isSampled
 	}
 
-	headers = append(headers, traceIdKey, kvDelimiter, xrayTraceId, traceHeaderDelimiter, parentIdKey,
-		kvDelimiter, parentId.String(), traceHeaderDelimiter, sampleFlagKey, kvDelimiter, samplingFlag)
+	headers = append(headers, traceIDKey, kvDelimiter, xrayTraceID, traceHeaderDelimiter, parentIDKey,
+		kvDelimiter, parentID.String(), traceHeaderDelimiter, sampleFlagKey, kvDelimiter, samplingFlag)
 
 	carrier.Set(traceHeaderKey, strings.Join(headers, ""))
 }
 
 // Extract extracts a context from the carrier if it contains AWS X-Ray headers.
-func (awsxray AwsXray) Extract(ctx context.Context, carrier otel.TextMapCarrier) context.Context {
+func (awsxray Xray) Extract(ctx context.Context, carrier otel.TextMapCarrier) context.Context {
 	// extract tracing information
-	if h := carrier.Get(traceHeaderKey); h != "" {
-		sc, err := extract(h)
+	if header := carrier.Get(traceHeaderKey); header != "" {
+		sc, err := extract(header)
 		if err == nil && sc.IsValid() {
 			return trace.ContextWithRemoteSpanContext(ctx, sc)
 		}
@@ -118,12 +117,12 @@ func extract(headerVal string) (trace.SpanContext, error) {
 			return empty, errInvalidTraceHeader
 		}
 		value := part[equalsIndex+1:]
-		if strings.HasPrefix(part, traceIdKey) {
-			sc.TraceID, err = parseTraceId(value)
+		if strings.HasPrefix(part, traceIDKey) {
+			sc.TraceID, err = parseTraceID(value)
 			if err != nil {
 				return empty, errMalformedTraceID
 			}
-		} else if strings.HasPrefix(part, parentIdKey) {
+		} else if strings.HasPrefix(part, parentIDKey) {
 			//extract parentId
 			sc.SpanID, err = trace.SpanIDFromHex(value)
 			if err != nil {
@@ -137,7 +136,7 @@ func extract(headerVal string) (trace.SpanContext, error) {
 	return sc, nil
 }
 
-//returns position of the first occurence of a substring starting at pos index
+//returns position of the first occurrence of a substring starting at pos index
 func indexOf(str string, substr string, pos int) int {
 	index := strings.Index(str[pos:], substr)
 	if index > -1 {
@@ -147,21 +146,21 @@ func indexOf(str string, substr string, pos int) int {
 }
 
 //returns trace Id if  valid else return invalid trace Id
-func parseTraceId(xrayTraceId string) (trace.ID, error) {
-	if len(xrayTraceId) != traceIdLength {
+func parseTraceID(xrayTraceID string) (trace.ID, error) {
+	if len(xrayTraceID) != traceIDLength {
 		return empty.TraceID, errMalformedTraceID
 	}
-	if !strings.HasPrefix(xrayTraceId, traceIdVersion) {
-		return empty.TraceID, errMalformedTraceID
-	}
-
-	if xrayTraceId[traceIdDelimitterIndex1:traceIdDelimitterIndex1+1] != traceIdDelimiter ||
-		xrayTraceId[traceIdDelimitterIndex2:+traceIdDelimitterIndex2+1] != traceIdDelimiter {
+	if !strings.HasPrefix(xrayTraceID, traceIDVersion) {
 		return empty.TraceID, errMalformedTraceID
 	}
 
-	epochPart := xrayTraceId[traceIdDelimitterIndex1+1 : traceIdDelimitterIndex2]
-	uniquePart := xrayTraceId[traceIdDelimitterIndex2+1 : traceIdLength]
+	if xrayTraceID[traceIDDelimitterIndex1:traceIDDelimitterIndex1+1] != traceIDDelimiter ||
+		xrayTraceID[traceIDDelimitterIndex2:traceIDDelimitterIndex2+1] != traceIDDelimiter {
+		return empty.TraceID, errMalformedTraceID
+	}
+
+	epochPart := xrayTraceID[traceIDDelimitterIndex1+1 : traceIDDelimitterIndex2]
+	uniquePart := xrayTraceID[traceIDDelimitterIndex2+1 : traceIDLength]
 
 	result := epochPart + uniquePart
 	return trace.IDFromHex(result)
@@ -175,6 +174,6 @@ func parseTraceFlag(xraySampledFlag string) byte {
 	return trace.FlagsSampled
 }
 
-func (awsxray AwsXray) Fields() []string {
+func (awsxray Xray) Fields() []string {
 	return []string{traceHeaderKey}
 }

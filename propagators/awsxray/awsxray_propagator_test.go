@@ -19,17 +19,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"go.opentelemetry.io/otel/api/trace"
 )
 
 var (
 	traceID                   = trace.ID{0x8a, 0x3c, 0x60, 0xf7, 0xd1, 0x88, 0xf8, 0xfa, 0x79, 0xd4, 0x8a, 0x39, 0x1a, 0x77, 0x8f, 0xa6}
-	xrayTraceId               = "1-8a3c60f7-d188f8fa79d48a391a778fa6"
+	xrayTraceID               = "1-8a3c60f7-d188f8fa79d48a391a778fa6"
 	parentID64Str             = "53995c3f42cd8ad8"
 	parentSpanID              = trace.SpanID{0x53, 0x99, 0x5c, 0x3f, 0x42, 0xcd, 0x8a, 0xd8}
-	sampledTraceFlag          = trace.FlagsSampled
 	zeroSpanIDStr             = "0000000000000000"
-	invalidSpanIDStr          = "0000000000010"
 	zeroTraceIDStr            = "1-00000000-000000000000000000000000"
 	invalidTraceHeaderID      = "1b00000000b000000000000000000000000"
 	wrongVersionTraceHeaderID = "5b00000000b000000000000000000000000"
@@ -44,7 +43,7 @@ func TestJaeger_Extract(t *testing.T) {
 		err          error
 	}{
 		{
-			xrayTraceId, parentID64Str, notSampled,
+			xrayTraceID, parentID64Str, notSampled,
 			trace.SpanContext{
 				TraceID:    traceID,
 				SpanID:     parentSpanID,
@@ -53,7 +52,7 @@ func TestJaeger_Extract(t *testing.T) {
 			nil,
 		},
 		{
-			xrayTraceId, parentID64Str, isSampled,
+			xrayTraceID, parentID64Str, isSampled,
 			trace.SpanContext{
 				TraceID:    traceID,
 				SpanID:     parentSpanID,
@@ -67,7 +66,7 @@ func TestJaeger_Extract(t *testing.T) {
 			errMalformedTraceID,
 		},
 		{
-			xrayTraceId, zeroSpanIDStr, isSampled,
+			xrayTraceID, zeroSpanIDStr, isSampled,
 			trace.SpanContext{},
 			errInvalidSpanIDLength,
 		},
@@ -84,7 +83,7 @@ func TestJaeger_Extract(t *testing.T) {
 	}
 
 	for _, test := range testData {
-		headerVal := strings.Join([]string{traceIdKey, kvDelimiter, test.traceID, traceHeaderDelimiter, parentIdKey, kvDelimiter,
+		headerVal := strings.Join([]string{traceIDKey, kvDelimiter, test.traceID, traceHeaderDelimiter, parentIDKey, kvDelimiter,
 			test.parentSpanID, traceHeaderDelimiter, sampleFlagKey, kvDelimiter, test.samplingFlag}, "")
 
 		sc, err := extract(headerVal)
