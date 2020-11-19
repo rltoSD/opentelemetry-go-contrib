@@ -58,6 +58,7 @@ var (
 // X-Amzn-Trace-Id: Root={traceId};Parent={parentId};Sampled={samplingFlag}
 type Xray struct{}
 
+// Asserts that the propagator implements the otel.textMapPropagator interface
 var _ otel.TextMapPropagator = &Xray{}
 
 // Inject injects a context to the carrier following AWS X-Ray format.
