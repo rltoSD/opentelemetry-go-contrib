@@ -34,7 +34,7 @@ var (
 	wrongVersionTraceHeaderID = "5b00000000b000000000000000000000000"
 )
 
-func TestJaeger_Extract(t *testing.T) {
+func TestAwsXrayExtract(t *testing.T) {
 	testData := []struct {
 		traceID      string
 		parentSpanID string

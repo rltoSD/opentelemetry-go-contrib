@@ -51,7 +51,7 @@ var (
 	errInvalidSpanIDLength = errors.New("invalid span id length, must be 16")
 )
 
-// AwsXray propagator serializes Span Context to/from AWS X-Ray headers
+// AWS X-Ray propagator serializes Span Context to/from AWS X-Ray headers
 //
 // AWS X-Ray format
 //
@@ -83,7 +83,7 @@ func (awsxray Xray) Inject(ctx context.Context, carrier otel.TextMapCarrier) {
 	carrier.Set(traceHeaderKey, strings.Join(headers, ""))
 }
 
-// Extract extracts a context from the carrier if it contains AWS X-Ray headers.
+// Extract gets a context from the carrier if it contains AWS X-Ray headers.
 func (awsxray Xray) Extract(ctx context.Context, carrier otel.TextMapCarrier) context.Context {
 	// extract tracing information
 	if header := carrier.Get(traceHeaderKey); header != "" {
@@ -95,6 +95,7 @@ func (awsxray Xray) Extract(ctx context.Context, carrier otel.TextMapCarrier) co
 	return ctx
 }
 
+//extracts Span Context from context
 func extract(headerVal string) (trace.SpanContext, error) {
 	var (
 		sc             = trace.SpanContext{}
