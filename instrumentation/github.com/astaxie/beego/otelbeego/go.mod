@@ -13,7 +13,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.14.0
 	go.opentelemetry.io/contrib/propagators v0.14.0
-	go.opentelemetry.io/otel v0.14.0
+	go.opentelemetry.io/otel v0.15.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
 	golang.org/x/sys v0.0.0-20200803210538-64077c9b5642 // indirect
 	golang.org/x/text v0.3.3 // indirect
