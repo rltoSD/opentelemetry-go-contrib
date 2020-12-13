@@ -11,6 +11,6 @@ require (
 	github.com/labstack/echo/v4 v4.1.17
 	github.com/stretchr/testify v1.6.1
 	go.opentelemetry.io/contrib v0.14.0
-	go.opentelemetry.io/contrib/propagators v0.14.0
-	go.opentelemetry.io/otel v0.14.0
+	go.opentelemetry.io/contrib/propagators v0.14.0 // indirect
+	go.opentelemetry.io/otel v0.15.0
 )
